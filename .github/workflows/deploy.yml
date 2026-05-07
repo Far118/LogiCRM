@@ -69,26 +69,19 @@ jobs:
       - name: Deploy on server
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host:     ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key:      ${{ secrets.SSH_PRIVATE_KEY }}
+          host:        ${{ secrets.SSH_HOST }}
+          username:    ${{ secrets.SSH_USER }}
+          key:         ${{ secrets.SSH_PRIVATE_KEY }}
           script_stop: true
           script: |
             set -e
             cd ${{ secrets.DEPLOY_PATH }}
 
             echo "=== Пересобираем backend ==="
-            docker compose up -d --build --no-deps backend
-
-            echo "=== Ждём готовности backend ==="
-            timeout 60 sh -c '
-              until wget -qO- http://localhost:3000/api/health > /dev/null 2>&1; do
-                echo "  ожидаем..."; sleep 3
-              done
-            '
+            docker compose up -d --build --no-deps --wait backend
 
             echo "=== Перезагружаем nginx ==="
             docker exec logicrm_nginx nginx -s reload
 
             echo "=== Деплой завершён ==="
-            wget -qO- http://localhost:3000/api/health
+            docker compose ps
