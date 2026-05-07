@@ -34,6 +34,7 @@ import { config }           from './config.js';
 import { checkConnection }  from './db/pool.js';
 
 import authRoutes           from './routes/auth.js';
+import plansRoutes from './routes/plans.js';
 import companiesRoutes      from './routes/companies.js';
 import contactsRoutes       from './routes/contacts.js';
 import activitiesRoutes     from './routes/activities.js';
