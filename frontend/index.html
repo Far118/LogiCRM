@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <style>html{visibility:hidden}</style>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Дашборд — LogiCRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .dash-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; }
+    @media (max-width: 1100px) { .dash-grid { grid-template-columns: 1fr; } }
+
+    /* Plan widget */
+    .plan-row {
+      display: flex; align-items: center; gap: .65rem;
+      padding: .5rem 0;
+    }
+    .plan-row + .plan-row { border-top: 1px solid var(--divider); }
+    .plan-label { font-size: .78rem; color: var(--text-muted); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .plan-bar-wrap { width: 90px; height: 6px; background: var(--surface-off); border-radius: var(--r-full); overflow: hidden; flex-shrink: 0; }
+    .plan-bar { height: 100%; border-radius: var(--r-full); transition: width .6s cubic-bezier(.16,1,.3,1); }
+    .plan-bar.good   { background: var(--success); }
+    .plan-bar.ok     { background: var(--primary); }
+    .plan-bar.warn   { background: var(--warning); }
+    .plan-bar.behind { background: var(--error); }
+    .plan-pct { font-size: .78rem; font-weight: 600; width: 38px; text-align: right; flex-shrink: 0; }
+    .plan-nums { font-size: .7rem; color: var(--text-faint); width: 90px; text-align: right; flex-shrink: 0; }
+    .plan-no-plan { padding: .75rem 0; font-size: .82rem; color: var(--text-muted); text-align: center; }
+    .task-row {
+      display: flex; align-items: center; gap: .75rem;
+      padding: .65rem 1rem; border-top: 1px solid var(--divider); cursor: pointer;
+    }
+    .task-row:hover { background: var(--surface-off); }
+    .task-check { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--text-faint); flex-shrink: 0; }
+    .task-row.overdue .task-check { border-color: var(--error); }
+    .task-text { flex: 1; min-width: 0; font-size: .9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .task-meta { font-size: .75rem; color: var(--text-muted); margin-top: 2px; display: flex; gap: .5rem; }
+    .task-meta .co { color: var(--primary); }
+    .task-row.overdue .task-due { color: var(--error); font-weight: 500; }
+    .sec-lbl { padding: .4rem 1rem .2rem; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); font-weight: 600; }
+    .sec-lbl.danger { color: var(--error); }
+    .co-row { display: flex; align-items: center; gap: .75rem; padding: .65rem 1rem; border-top: 1px solid var(--divider); cursor: pointer; }
+    .co-row:hover { background: var(--surface-off); }
+    .co-name { font-weight: 500; flex: 1; min-width: 0; font-size: .9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .co-meta { font-size: .75rem; color: var(--text-muted); display: flex; gap: .4rem; align-items: center; }
+    .qa { display: flex; align-items: center; gap: .75rem; padding: .65rem 1rem; color: var(--text); font-size: .9em; }
+    .qa:hover { background: var(--surface-off); }
+    .qa svg { width: 15px; height: 15px; color: var(--primary); flex-shrink: 0; }
+    .qa-name { flex: 1; font-weight: 500; }
+    .qa-hint { font-size: .72rem; color: var(--text-faint); }
+    .week-row { display: flex; align-items: center; justify-content: space-between; padding: .45rem 0; }
+    .week-row + .week-row { border-top: 1px solid var(--divider); }
+    .ph-card { padding: 2rem 1rem; text-align: center; color: var(--text-muted); }
+    .ph-card h4 { font-size: .9em; font-weight: 600; color: var(--text); margin-bottom: .3rem; }
+  </style>
+</head>
+<body>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <h1 class="topbar-title">Дашборд</h1>
+      <a href="/companies.html?new=1" class="btn btn-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Новая компания
+      </a>
+    </header>
+
+    <main class="content">
+      <div style="margin-bottom:1.5rem">
+        <h2 id="greetTitle" style="font-size:clamp(1.25rem,1.1rem+.75vw,1.75rem);font-weight:700;letter-spacing:-.01em">Привет!</h2>
+        <p id="greetSub" style="color:var(--text-muted);margin-top:.25rem;font-size:.9em">Загружаем…</p>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div><div class="stat-num" id="sOverdue">—</div><div class="stat-label">Просрочено</div></div></div>
+        <div class="stat-card"><div class="stat-icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div><div class="stat-num" id="sToday">—</div><div class="stat-label">На сегодня</div></div></div>
+        <div class="stat-card"><div class="stat-icon teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div><div><div class="stat-num" id="sWeek">—</div><div class="stat-label">На неделю</div></div></div>
+        <div class="stat-card"><div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1"/><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg></div><div><div class="stat-num" id="sCompanies">—</div><div class="stat-label" id="sCompLabel">Компаний</div></div></div>
+      </div>
+
+      <div class="dash-grid">
+        <div>
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Мои задачи</div>
+              <a href="/activities.html" class="card-link">Все →</a>
+            </div>
+            <div class="card-body" id="tasksBody"><div style="padding:.75rem 1rem"><div class="skeleton" style="width:65%"></div><div class="skeleton" style="width:80%;margin-top:.5rem"></div></div></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Воронка продаж</div></div>
+            <div class="card-body"><div class="ph-card"><h4>Реализуется в Спринте 2</h4><p style="font-size:.85em;margin-top:.25rem">Канбан по стадиям сделок.</p></div></div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1"/><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>Свежие компании</div>
+              <a href="/companies.html" class="card-link">Все →</a>
+            </div>
+            <div class="card-body" id="freshBody"><div style="padding:.75rem 1rem"><div class="skeleton" style="width:70%"></div></div></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>За последние 7 дней</div></div>
+            <div class="card-body padded" id="weekBody"><div class="skeleton" style="width:60%"></div></div>
+          </div>
+          <div class="card" id="planCard">
+            <div class="card-head">
+              <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                План на месяц
+              </div>
+              <span id="planMonth" style="font-size:.75rem;color:var(--text-muted)"></span>
+            </div>
+            <div class="card-body padded" id="planBody">
+              <div class="skeleton" style="width:80%;height:8px;border-radius:4px"></div>
+              <div class="skeleton" style="width:65%;height:8px;border-radius:4px;margin-top:.5rem"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><div class="card-title">Быстрые действия</div></div>
+            <div class="card-body">
+              <a href="/companies.html?new=1" class="qa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span class="qa-name">Новая компания</span><span class="qa-hint">N</span></a>
+              <a href="/companies.html" class="qa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span class="qa-name">Найти компанию</span><span class="qa-hint">/</span></a>
+              <a href="/deals.html?new=1" class="qa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span class="qa-name">Новая сделка</span><span class="qa-hint">D</span></a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    import { initUI, esc, fmtDate, todayStr } from '/js/ui.js';
+    import { getCompanies, SEGMENT_LABELS, SEGMENT_COLORS } from '/js/companies.js';
+    import { getMyActivities } from '/js/activities.js';
+    import { dbGetAll } from '/js/db.js';
+    import { can, ROLES } from '/js/auth.js';
+
+    const session = await initUI({ active: 'dashboard' });
+    if (!session) throw new Error('no session');
+
+    async function loadMyPlan() {
+      try {
+        const now = new Date();
+        const res = await fetch(`/api/plans/my?year=${now.getFullYear()}&month=${now.getMonth()+1}`, {credentials:'include'});
+        return res.ok ? await res.json() : null;
+      } catch { return null; }
+    }
+
+    const h = new Date().getHours();
+    const g = h<6?'Доброй ночи':h<12?'Доброе утро':h<17?'Добрый день':'Добрый вечер';
+    document.getElementById('greetTitle').textContent = `${g}, ${session.first_name||session.email.split('@')[0]}!`;
+
+    document.addEventListener('keydown', e => {
+      if (e.target.matches('input,textarea,select')) return;
+      if (e.key==='n'||e.key==='т') location.href='/companies.html?new=1';
+      if (e.key==='/') { e.preventDefault(); location.href='/companies.html'; }
+      if (e.key==='d'||e.key==='в') location.href='/deals.html?new=1';
+    });
+
+    const [activities, companies, planData] = await Promise.all([getMyActivities(), getCompanies(), loadMyPlan()]);
+    const compById = Object.fromEntries(companies.map(c=>[c.id,c]));
+    const today = todayStr();
+    const weekEnd = (()=>{ const d=new Date(); d.setDate(d.getDate()+7); return d.toISOString().split('T')[0]; })();
+    const weekAgo = (()=>{ const d=new Date(); d.setDate(d.getDate()-7); return d.toISOString(); })();
+
+    const tasks    = activities.filter(a=>a.next_step&&a.next_step_due&&!a.is_done);
+    const overdue  = tasks.filter(a=>a.next_step_due<today).sort((a,b)=>a.next_step_due.localeCompare(b.next_step_due));
+    const todayT   = tasks.filter(a=>a.next_step_due===today);
+    const weekT    = tasks.filter(a=>a.next_step_due>today&&a.next_step_due<=weekEnd).sort((a,b)=>a.next_step_due.localeCompare(b.next_step_due));
+
+    document.getElementById('sOverdue').textContent   = overdue.length;
+    document.getElementById('sToday').textContent     = todayT.length;
+    document.getElementById('sWeek').textContent      = weekT.length;
+    document.getElementById('sCompanies').textContent = companies.length;
+    document.getElementById('sCompLabel').textContent = can([ROLES.MANAGER]) ? 'Моих компаний' : 'Всего компаний';
+
+    // ── Виджет плана
+    renderPlan(planData);
+
+    function renderPlan(data) {
+      const now = new Date();
+      const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+      document.getElementById('planMonth').textContent = MONTHS[now.getMonth()] + ' ' + now.getFullYear();
+
+      if (!data || !data.plan) {
+        const isHead = can([ROLES.ADMIN, ROLES.HEAD]);
+        document.getElementById('planBody').innerHTML =
+          '<div class="plan-no-plan">' +
+          (isHead
+            ? '<a href="/plans.html" style="color:var(--primary)">Установить планы для команды →</a>'
+            : 'Руководитель ещё не установил план на этот месяц') +
+          '</div>';
+        return;
+      }
+
+      const { plan, fact, progress } = data;
+      const fmtRub = n => {
+        n = Number(n||0);
+        if (n >= 1000000) return (n/1000000).toFixed(1)+' млн';
+        if (n >= 1000)    return (n/1000).toFixed(0)+' тыс';
+        return String(n);
+      };
+
+      const daysTotal  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+      const daysPassed = now.getDate();
+      const monthPct   = Math.round(daysPassed / daysTotal * 100);
+
+      const rows = [
+        { label:'💰 Выручка',      pct:progress.revenue,
+          nums:fmtRub(fact.revenue)+' / '+fmtRub(plan.target_revenue)+' ₽' },
+        { label:'🏆 Сделок',       pct:progress.deals_won,
+          nums:fact.deals_won+' / '+plan.target_deals_won },
+        { label:'📋 Активностей',  pct:progress.activities,
+          nums:fact.activities+' / '+plan.target_activities },
+        { label:'📞 Звонков',      pct:progress.calls,
+          nums:fact.calls+' / '+plan.target_calls },
+        { label:'🤝 Встреч',       pct:progress.meetings,
+          nums:fact.meetings+' / '+plan.target_meetings },
+        { label:'📄 КП',           pct:progress.proposals,
+          nums:fact.proposals+' / '+plan.target_proposals },
+        { label:'🏢 Компаний',     pct:progress.new_companies,
+          nums:fact.new_companies+' / '+plan.target_new_companies },
+      ].filter(r => r.pct !== null);
+
+      const html = rows.map(function(r) {
+        const p = r.pct || 0;
+        const barClass = p >= 100 ? 'good' : p >= monthPct ? 'ok' : p >= monthPct * 0.7 ? 'warn' : 'behind';
+        const pctColor = p >= 100 ? 'var(--success)' : p >= monthPct ? 'var(--primary)' : p >= monthPct * 0.7 ? 'var(--warning)' : 'var(--error)';
+        return '<div class="plan-row">' +
+          '<div class="plan-label">' + r.label + '</div>' +
+          '<div class="plan-nums">' + r.nums + '</div>' +
+          '<div class="plan-bar-wrap"><div class="plan-bar ' + barClass + '" style="width:' + Math.min(p,100) + '%"></div></div>' +
+          '<div class="plan-pct" style="color:' + pctColor + '">' + p + '%</div>' +
+          '</div>';
+      }).join('') +
+        '<div style="margin-top:.75rem;padding-top:.65rem;border-top:1px solid var(--divider);font-size:.7rem;color:var(--text-faint)">' +
+        'Прошло ' + daysPassed + ' из ' + daysTotal + ' дней (' + monthPct + '%)' +
+        '</div>';
+
+      document.getElementById('planBody').innerHTML = html;
+    }
+
+    const parts=[];
+    if (overdue.length) parts.push(`<strong style="color:var(--error)">${overdue.length} просрочено</strong>`);
+    if (todayT.length) parts.push(`${todayT.length} на сегодня`);
+    if (!parts.length) parts.push('всё под контролем');
+    document.getElementById('greetSub').innerHTML = parts.join(' · ');
+
+    const tRow=a=>{const c=compById[a.company_id];const ov=a.next_step_due<today?'overdue':'';return`<a href="${c?'/company.html?id='+c.id:'/activities.html'}" class="task-row ${ov}"><div class="task-check"></div><div style="flex:1;min-width:0"><div class="task-text">${esc(a.next_step)}</div><div class="task-meta">${c?`<span class="co">${esc(c.name)}</span>`:''}<span class="task-due">${fmtDate(a.next_step_due)}</span></div></div></a>`;};
+    let tHtml='';
+    if(overdue.length){tHtml+=`<div class="sec-lbl danger">Просрочено · ${overdue.length}</div>`;tHtml+=overdue.slice(0,5).map(tRow).join('');}
+    if(todayT.length){tHtml+=`<div class="sec-lbl">Сегодня · ${todayT.length}</div>`;tHtml+=todayT.slice(0,5).map(tRow).join('');}
+    if(weekT.length){tHtml+=`<div class="sec-lbl">Эта неделя · ${weekT.length}</div>`;tHtml+=weekT.slice(0,5).map(tRow).join('');}
+    if(!tHtml)tHtml=`<div class="empty-mini">✓ Нет задач на ближайшую неделю</div>`;
+    document.getElementById('tasksBody').innerHTML=tHtml;
+
+    const fresh=[...companies].sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||'')).slice(0,5);
+    document.getElementById('freshBody').innerHTML = !fresh.length
+      ? `<div class="empty-mini"><a href="/companies.html?new=1" class="btn btn-primary btn-sm">Создать первую</a></div>`
+      : fresh.map(c=>`<a href="/company.html?id=${c.id}" class="co-row"><div style="flex:1;min-width:0"><div class="co-name">${esc(c.name)}</div><div class="co-meta"><span class="badge badge-${SEGMENT_COLORS[c.segment]||'gray'}"><span class="badge-dot"></span>${SEGMENT_LABELS[c.segment]||c.segment}</span><span>· ${fmtDate(c.created_at)}</span></div></div></a>`).join('');
+
+    const myWeek=activities.filter(a=>a.occurred_at&&a.occurred_at>=weekAgo);
+    const cnt={calls:myWeek.filter(a=>['call_out','call_in'].includes(a.type)).length,emails:myWeek.filter(a=>['email_out','email_in'].includes(a.type)).length,meetings:myWeek.filter(a=>a.type==='meeting').length,proposals:myWeek.filter(a=>a.type==='proposal').length};
+    const total=Object.values(cnt).reduce((s,v)=>s+v,0);
+    const row=(l,n,col)=>n?`<div class="week-row"><span>${l}</span><span class="badge badge-${col}"><span class="badge-dot"></span>${n}</span></div>`:'';
+    document.getElementById('weekBody').innerHTML = !total
+      ? `<div style="color:var(--text-muted);font-size:.88em">Активностей за неделю пока нет.</div>`
+      : row('📞 Звонки',cnt.calls,'teal')+row('✉️ Письма',cnt.emails,'blue')+row('🤝 Встречи',cnt.meetings,'orange')+row('📄 КП',cnt.proposals,'green')+`<div style="margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--divider);display:flex;justify-content:space-between;font-size:.8rem;color:var(--text-muted)"><span>Всего касаний</span><strong style="color:var(--text)">${total}</strong></div>`;
+  </script>
+</body>
+</html>

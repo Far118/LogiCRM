@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.min.js"></script>
+  <style>html{visibility:hidden}</style>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Компания — LogiCRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .breadcrumb { display: flex; align-items: center; gap: .5rem; flex: 1; min-width: 0; font-size: .9em; }
+    .breadcrumb a { color: var(--text-muted); }
+    .breadcrumb a:hover { color: var(--text); }
+    .breadcrumb-sep { color: var(--text-faint); }
+    .breadcrumb-cur { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55ch; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    /* Routes editor */
+    .route-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; }
+    .route-row .input { flex: 1; }
+    .route-arr { color: var(--text-faint); flex-shrink: 0; }
+    .route-del { padding: .4rem; border-radius: var(--r-md); color: var(--text-faint); }
+    .route-del:hover { color: var(--error); background: var(--surface-off); }
+    .add-row-btn {
+      display: inline-flex; align-items: center; gap: .25rem;
+      padding: .4rem .75rem; font-size: .78rem; color: var(--primary); font-weight: 500;
+      border: 1px dashed var(--border); border-radius: var(--r-md);
+    }
+    .add-row-btn:hover { border-color: var(--primary); background: var(--primary-subtle); }
+    /* Contact card */
+    .contact-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r-lg); padding: 1rem;
+      display: flex; align-items: flex-start; gap: 1rem;
+      box-shadow: var(--shadow-sm); margin-bottom: .75rem;
+    }
+    .contact-ava {
+      width: 40px; height: 40px; border-radius: var(--r-full);
+      background: var(--primary-subtle); color: var(--primary);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .9rem; font-weight: 600; flex-shrink: 0;
+    }
+    .contact-body { flex: 1; min-width: 0; }
+    .contact-name-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+    .contact-name { font-weight: 600; font-size: .9em; }
+    .contact-pos { color: var(--text-muted); font-size: .78rem; }
+    .contact-channels { display: flex; gap: .75rem; margin-top: .35rem; font-size: .78rem; color: var(--text-muted); flex-wrap: wrap; }
+    .contact-channels a { color: var(--text); }
+    .contact-channels a:hover { color: var(--primary); }
+    .contact-actions { display: flex; gap: .25rem; align-self: flex-start; opacity: 0; transition: opacity var(--t); }
+    .contact-card:hover .contact-actions { opacity: 1; }
+    /* Activity feed */
+    .act-form-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 1rem; margin-bottom: 1rem; box-shadow: var(--shadow-sm); }
+    .act-item { display: flex; gap: .75rem; padding: .9rem 0; border-bottom: 1px solid var(--divider); }
+    .act-item:last-child { border-bottom: none; }
+    .act-icon { width: 30px; height: 30px; border-radius: var(--r-full); background: var(--surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--text-muted); }
+    .act-icon svg { width: 13px; height: 13px; }
+    .act-icon.teal  { background: var(--primary-subtle); color: var(--primary); border-color: transparent; }
+    .act-icon.blue  { background: color-mix(in oklch, var(--blue) 12%, var(--surface)); color: var(--blue); border-color: transparent; }
+    .act-icon.orange{ background: color-mix(in oklch, var(--orange) 12%, var(--surface)); color: var(--orange); border-color: transparent; }
+    .act-icon.red   { background: color-mix(in oklch, var(--error) 12%, var(--surface)); color: var(--error); border-color: transparent; }
+    .act-icon.green { background: color-mix(in oklch, var(--success) 12%, var(--surface)); color: var(--success); border-color: transparent; }
+    .act-body { flex: 1; min-width: 0; }
+    .act-head { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: .25rem; }
+    .act-type { font-weight: 600; font-size: .88rem; }
+    .act-time { color: var(--text-faint); font-size: .75rem; }
+    .act-desc { font-size: .88rem; white-space: pre-wrap; }
+    .act-outcome { font-size: .75rem; color: var(--text-muted); padding: .4rem .65rem; background: var(--surface-off); border-radius: var(--r-md); margin-top: .4rem; }
+    .act-next { display: flex; align-items: center; gap: .4rem; margin-top: .4rem; font-size: .75rem; color: var(--text-muted); }
+    .act-next.overdue { color: var(--error); font-weight: 500; }
+    .next-check { width: 14px; height: 14px; border-radius: 3px; border: 1.5px solid var(--text-faint); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+    .next-check.done { background: var(--success); border-color: var(--success); color: #fff; }
+    .next-check.done::after { content: ''; width: 5px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-bottom: 1px; }
+    .act-actions { opacity: 0; }
+    .act-item:hover .act-actions { opacity: 1; }
+    .ph-block { background: var(--surface); border: 1px dashed var(--border); border-radius: var(--r-lg); padding: 3rem 2rem; text-align: center; color: var(--text-muted); }
+    .ph-block h3 { color: var(--text); font-size: 1em; margin-bottom: .35rem; }
+  </style>
+</head>
+<body x-data="companyPage" x-init="initPage()">
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <nav class="breadcrumb">
+        <a href="/companies.html">Компании</a>
+        <span class="breadcrumb-sep">/</span>
+        <span class="breadcrumb-cur" id="bcName">…</span>
+      </nav>
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <span class="draft-indicator" id="draftInd" hidden></span>
+        <button class="btn btn-ghost" id="btnCancel" hidden>Отмена</button>
+        <button class="btn btn-danger" id="btnDelete" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
+          Удалить
+        </button>
+        <button class="btn btn-ghost" id="btnEdit" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Редактировать
+        </button>
+        <button class="btn btn-primary" id="btnSave" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Сохранить
+        </button>
+      </div>
+    </header>
+
+    <div class="head-card" id="headCard">
+      <div class="head-name" id="compName">…</div>
+      <div class="head-meta" id="compMeta"></div>
+    </div>
+
+    <nav class="tabs" id="tabsNav">
+      <button class="tab active" data-tab="overview">Обзор</button>
+      <button class="tab" data-tab="contacts">Контакты <span class="tab-count" id="cntContacts">0</span></button>
+      <button class="tab" data-tab="deals">Сделки <span class="tab-count" id="cntDeals">0</span></button>
+      <button class="tab" data-tab="activities">Активности <span class="tab-count" id="cntActs">0</span></button>
+    </nav>
+
+    <div class="content" style="overflow-y:auto">
+      <!-- ── Overview ── -->
+      <div class="panel active" data-panel="overview" id="panelOverview"></div>
+
+      <!-- ── Contacts ── -->
+      <div class="panel" data-panel="contacts">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+          <h2 style="font-size:1em;font-weight:600">Контакты</h2>
+          <button class="btn btn-primary btn-sm" id="btnAddContact">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Добавить
+          </button>
+        </div>
+        <div id="contactsList"></div>
+      </div>
+
+      <!-- ── Deals (заглушка) ── -->
+      <div class="panel" data-panel="deals">
+        <div id="dealsList"></div>
+      </div>
+
+      <!-- ── Activities ── -->
+      <div class="panel" data-panel="activities">
+        <div class="act-form-wrap" id="actForm">
+          <div class="form-grid form-grid-auto" style="gap:.75rem">
+            <div class="field"><label class="field-label">Тип <span class="req">*</span></label>
+              <select id="actType" class="select">
+                <option value="call_out">Звонок исходящий</option>
+                <option value="call_in">Звонок входящий</option>
+                <option value="email_out">Письмо исходящее</option>
+                <option value="email_in">Письмо входящее</option>
+                <option value="meeting">Встреча</option>
+                <option value="task">Задача</option>
+                <option value="proposal">Отправка КП</option>
+                <option value="note">Заметка</option>
+              </select>
+            </div>
+            <div class="field"><label class="field-label">Дата/время</label><input type="datetime-local" id="actOccurred" class="input"></div>
+            <div class="field"><label class="field-label">Контакт</label><select id="actContact" class="select"><option value="">— не выбран —</option></select></div>
+          </div>
+          <div class="field" style="margin-top:.75rem"><label class="field-label">Описание / итог</label>
+            <textarea id="actDesc" class="textarea" rows="2" placeholder="О чём говорили, что договорились…"></textarea>
+          </div>
+          <div class="form-grid form-grid-2" style="gap:.75rem;margin-top:.75rem">
+            <div class="field"><label class="field-label">Следующий шаг</label><input type="text" id="actNextStep" class="input" placeholder="Позвонить / отправить КП…"></div>
+            <div class="field"><label class="field-label">Дедлайн</label><input type="date" id="actNextDue" class="input"></div>
+          </div>
+          <div style="margin-top:.75rem;display:flex;gap:.5rem;justify-content:flex-end">
+            <button class="btn btn-ghost btn-sm" id="actReset">Очистить</button>
+            <button class="btn btn-primary btn-sm" id="actSubmit">Добавить</button>
+          </div>
+        </div>
+        <div id="actFeed"></div>
+        <div class="empty-state" id="actEmpty" hidden>
+          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <h3>Активностей пока нет</h3>
+          <p>Добавьте первый звонок, письмо или задачу.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modal: Контакт ── -->
+  <div class="modal-backdrop" id="contactModal">
+    <div class="modal modal-sm">
+      <div class="modal-head"><h3 class="modal-title" id="ctTitle">Новый контакт</h3></div>
+      <div class="modal-body">
+        <input type="hidden" id="ctId">
+        <div class="form-grid form-grid-2">
+          <div class="field"><label class="field-label">Имя <span class="req">*</span></label><input id="ctFirst" class="input"></div>
+          <div class="field"><label class="field-label">Фамилия</label><input id="ctLast" class="input"></div>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div class="field"><label class="field-label">Должность</label><input id="ctPos" class="input"></div>
+          <div class="field"><label class="field-label">Роль</label>
+            <select id="ctRole" class="select"><option value="lpr">ЛПР</option><option value="influencer">Влияет на решение</option><option value="executor">Исполнитель</option><option value="blocker">Блокер</option><option value="unknown" selected>Неизвестно</option></select>
+          </div>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div class="field"><label class="field-label">Телефон</label><input id="ctPhone" class="input" placeholder="+7…"></div>
+          <div class="field"><label class="field-label">Email</label><input type="email" id="ctEmail" class="input"></div>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div class="field"><label class="field-label">Telegram</label><input id="ctTg" class="input" placeholder="@username"></div>
+          <div class="field"><label class="field-label">WhatsApp</label><input id="ctWa" class="input"></div>
+        </div>
+        <div class="field"><label class="field-label">Предпочтительный канал</label>
+          <select id="ctChan" class="select"><option value="">— не выбрано —</option><option value="phone">Телефон</option><option value="email">Email</option><option value="telegram">Telegram</option><option value="whatsapp">WhatsApp</option></select>
+        </div>
+        <div class="field"><label class="field-label">Заметки</label><textarea id="ctNotes" class="textarea" rows="2"></textarea></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" id="ctCancel">Отмена</button>
+        <button class="btn btn-primary" id="ctSave">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    import { initUI, esc, fmtDate, fmtDateTime, toast, todayStr } from '/js/ui.js';
+    import { getCompany, createCompany, updateCompany, deleteCompany,
+             SEGMENT_LABELS, SEGMENT_COLORS, PRIORITY_LABELS } from '/js/companies.js';
+    import { getContacts, createContact, updateContact, deleteContact,
+             CONTACT_ROLE_LABELS, getContactFullName } from '/js/contacts.js';
+    import { getActivitiesByCompany, createActivity, deleteActivity, markDone,
+             ACTIVITY_TYPE_LABELS, ACTIVITY_TYPE_COLORS, ACTIVITY_TYPE_ICONS, isOverdue } from '/js/activities.js';
+    import { getDealsByCompany } from '/js/deals.js';
+    import { dbGetAll } from '/js/db.js';
+    import { can, ROLES } from '/js/auth.js';
+
+    const session = await initUI({ active: 'companies' });
+    if (!session) throw new Error('no session');
+
+    // ── Routing
+    const params   = new URLSearchParams(location.search);
+    const isNew    = params.has('new');
+    const wantEdit = params.has('edit');
+    const companyId = params.get('id') || null;
+    let isEditing = isNew || wantEdit;
+
+    let company  = null;
+    let users    = [];
+    let contacts = [];
+
+    // Справочники (синхронизированы с backend seed)
+    const REGIONS   = ['Москва','СПб','Центр','Юг','Урал','Сибирь','Дальний Восток','Беларусь','Казахстан','Китай','ЕС','Турция'];
+    const CARGO_T   = [{v:'general',l:'Генеральный'},{v:'bulk',l:'Насыпной'},{v:'oversize',l:'Негабарит'},{v:'adr',l:'Опасные ADR'},{v:'reefer',l:'Рефрижератор'},{v:'valuable',l:'Ценный груз'},{v:'docs',l:'Документы'},{v:'other_cargo',l:'Другое'}];
+    const DIRS      = [{v:'road',l:'Авто'},{v:'sea',l:'Море'},{v:'air',l:'Авиа'},{v:'rail',l:'ЖД'},{v:'multimodal',l:'Мультимодал'},{v:'customs',l:'Таможня'},{v:'warehouse',l:'Склад'}];
+    const SOURCES   = [{v:'cold_call',l:'Холодный звонок'},{v:'inbound',l:'Входящий'},{v:'referral',l:'Реферал'},{v:'exhibition',l:'Выставка'},{v:'tender',l:'Тендер'},{v:'other_src',l:'Другое'}];
+    const FREQS     = [{v:'one_time_f',l:'Разовые'},{v:'few_per_year',l:'Несколько раз в год'},{v:'monthly',l:'Ежемесячные'},{v:'weekly',l:'Еженедельные'}];
+    const POTENTIALS= [{v:'one_time',l:'Разовый'},{v:'regular',l:'Регулярный'},{v:'tender_p',l:'Тендерный'},{v:'strategic',l:'Стратегический'}];
+
+    function fresh() {
+      const segParam = new URLSearchParams(location.search).get('segment');
+      return { id:null,name:'',inn:'',ogrn:'',website:'',address_legal:'',address_actual:'',
+        regions:[],industry:'',description:'',
+        segment: segParam || 'cold_lead',cargo_types:[],directions:[],routes:[],
+        shipment_freq:'',volume_monthly:'',potential:'',current_carrier:'',switch_reason:'',
+        owner_id:session.id,source:'',priority:'medium',tags:[],
+        next_action_at:'',next_action_type:'',first_contact_at:new Date().toISOString().split('T')[0],
+      };
+    }
+
+    users = await dbGetAll('users').catch(()=>[]);
+    const userById = Object.fromEntries(users.map(u=>[u.id,u]));
+    // ── Activities
+    const ACT_COLORS={call_out:'teal',call_in:'teal',email_out:'blue',email_in:'blue',meeting:'orange',task:'red',proposal:'green',note:'gray'};
+    const ACT_ICONS={
+      call_out:'<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.19 12 19.79 19.79 0 0 1 1.12 3.38 2 2 0 0 1 3.11 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 21 16.92z"/>',
+      email_out:'<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
+      meeting:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+      task:'<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+      proposal:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>',
+      note:'<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+    };
+    ACT_ICONS.call_in=ACT_ICONS.call_out;ACT_ICONS.email_in=ACT_ICONS.email_out;
+
+    async function loadActivities(){
+      if(!company.id){document.getElementById('actFeed').innerHTML='';document.getElementById('actEmpty').hidden=false;return;}
+      const list=await getActivitiesByCompany(company.id);
+      document.getElementById('cntActs').textContent=list.length;
+      if(!list.length){document.getElementById('actFeed').innerHTML='';document.getElementById('actEmpty').hidden=false;return;}
+      document.getElementById('actEmpty').hidden=true;
+      document.getElementById('actFeed').innerHTML=list.map(a=>{
+        const color=ACT_COLORS[a.type]||'gray';
+        const icon=ACT_ICONS[a.type]||'';
+        const ov=isOverdue(a);
+        const ct=contacts.find(c=>c.id===a.contact_id);
+        return `<div class="act-item" data-aid="${a.id}">
+          <div class="act-icon ${color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icon}</svg></div>
+          <div class="act-body">
+            <div class="act-head">
+              <span class="act-type">${ACTIVITY_TYPE_LABELS[a.type]||a.type}</span>
+              <span class="act-time">${fmtDateTime(a.occurred_at)}${ct?' · '+esc(getContactFullName(ct)):''}</span>
+            </div>
+            ${a.description?`<div class="act-desc">${esc(a.description)}</div>`:''}
+            ${a.outcome?`<div class="act-outcome"><strong>Итог:</strong> ${esc(a.outcome)}</div>`:''}
+            ${a.next_step?`<div class="act-next${ov?' overdue':''}">
+              <span class="next-check${a.is_done?' done':''}" data-done="${a.id}"></span>
+              <strong>Следующий шаг:</strong> ${esc(a.next_step)}
+              ${a.next_step_due?` · до ${fmtDate(a.next_step_due)}${ov?' (просрочено)':''}`:''}</div>`:''}
+          </div>
+          <div class="act-actions">
+            <button class="icon-btn danger" data-adel="${a.id}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg></button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // ── Init
+    if (isNew) {
+      company = fresh();
+      renderHead(); renderOverview(); applyMode();
+      setTimeout(()=>document.getElementById('fldName')?.focus(), 50);
+    } else if (companyId) {
+      try {
+        company = await getCompany(companyId);
+        if (!company) { toast('Компания не найдена', 'error'); setTimeout(()=>location.href='/companies.html',1500); }
+        else { renderHead(); renderOverview(); applyMode(); await Promise.all([loadContacts(),loadActivities()]); }
+      } catch(err) { toast(err.message,'error'); setTimeout(()=>location.href='/companies.html',1500); }
+    } else { location.href='/companies.html'; }
+
+    // ── Head
+    function renderHead() {
+      const name = (isNew&&!company.name) ? 'Новая компания' : (company.name||'—');
+      document.getElementById('bcName').textContent   = name;
+      document.getElementById('compName').textContent = name;
+      document.title = `${name} — LogiCRM`;
+      if (isNew) { document.getElementById('compMeta').innerHTML=''; return; }
+      const owner = userById[company.owner_id];
+      const ownerName = owner ? [owner.first_name,owner.last_name].filter(Boolean).join(' ')||owner.email : '—';
+      const segC = SEGMENT_COLORS[company.segment]||'gray';
+      const ov = company.next_action_at && company.next_action_at < todayStr();
+      document.getElementById('compMeta').innerHTML = `
+        <span class="badge badge-${segC}"><span class="badge-dot"></span>${SEGMENT_LABELS[company.segment]||company.segment}</span>
+        <span class="meta-item"><span class="priority-dot priority-${company.priority||'medium'}"></span>${PRIORITY_LABELS[company.priority]||''}</span>
+        <span class="meta-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><strong>${esc(ownerName)}</strong></span>
+        ${company.next_action_at ? `<span class="meta-item${ov?' overdue':''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><strong>${fmtDate(company.next_action_at)}</strong></span>` : ''}
+      `;
+    }
+
+    // ── Overview view / edit
+    function renderOverview() {
+      const root = document.getElementById('panelOverview');
+      root.innerHTML = isEditing ? buildForm() : buildView();
+      if (isEditing) wireForm();
+    }
+
+    function fld(label, val, html=false) {
+      const v = (val===''||val==null) ? '<span class="field-value empty">—</span>' : `<span class="field-value">${html?val:esc(String(val))}</span>`;
+      return `<div class="field"><div class="field-label">${label}</div>${v}</div>`;
+    }
+    function chips(label, arr, dict) {
+      const v = (!arr||!arr.length) ? '<span class="field-value empty">—</span>' : `<div class="chip-group" style="margin-top:2px">${arr.map(x=>`<span class="chip chip-readonly">${esc(dict?.[x]??x)}</span>`).join('')}</div>`;
+      return `<div class="field"><div class="field-label">${label}</div>${v}</div>`;
+    }
+
+    function buildView() {
+      const srcDict  = Object.fromEntries(SOURCES.map(o=>[o.v,o.l]));
+      const freqDict = Object.fromEntries(FREQS.map(o=>[o.v,o.l]));
+      const potDict  = Object.fromEntries(POTENTIALS.map(o=>[o.v,o.l]));
+      const cargoDict= Object.fromEntries(CARGO_T.map(o=>[o.v,o.l]));
+      const dirDict  = Object.fromEntries(DIRS.map(o=>[o.v,o.l]));
+      const regDict  = Object.fromEntries(REGIONS.map(r=>[r,r]));
+      const owner    = userById[company.owner_id];
+      const ownerName= owner ? [owner.first_name,owner.last_name].filter(Boolean).join(' ')||owner.email : '';
+      const tags     = (company.tags||[]).map(t=>`<span class="chip chip-readonly">#${esc(t)}</span>`).join('');
+      const routes   = (company.routes||[]).map(r=>`<div>${esc(r.from)} → ${esc(r.to)}</div>`).join('') || '<span class="field-value empty">—</span>';
+      const websiteVal = company.website ? `<a href="${esc(company.website.startsWith('http')?company.website:'https://'+company.website)}" target="_blank" rel="noopener">${esc(company.website)}</a>` : '';
+
+      return `
+        <div class="section-card"><div class="section-title">Основные данные</div>
+          <div class="form-grid form-grid-auto">
+            ${fld('Название',company.name)}${fld('ИНН',company.inn)}${fld('ОГРН',company.ogrn)}
+            ${fld('Сайт',websiteVal,true)}${fld('Юридический адрес',company.address_legal)}
+            ${fld('Фактический адрес',company.address_actual)}
+            ${chips('Регионы',company.regions,regDict)}${fld('Отрасль',company.industry)}
+          </div>
+          <div class="field" style="margin-top:1rem"><div class="field-label">Описание</div>
+            <div class="field-value">${company.description?esc(company.description).replace(/\n/g,'<br>'):'<span class="field-value empty">—</span>'}</div>
+          </div>
+        </div>
+        <div class="section-card"><div class="section-title">Классификация</div>
+          <div class="form-grid form-grid-auto">
+            ${fld('Сегмент',SEGMENT_LABELS[company.segment]||company.segment)}
+            ${chips('Типы грузов',company.cargo_types,cargoDict)}
+            ${chips('Направления',company.directions,dirDict)}
+            <div class="field"><div class="field-label">Маршруты</div>${routes}</div>
+            ${fld('Регулярность',freqDict[company.shipment_freq]||'')}
+            ${fld('Объём в мес.',company.volume_monthly)}
+            ${fld('Потенциал',potDict[company.potential]||'')}
+            ${fld('Текущий перевозчик',company.current_carrier)}
+            ${fld('Причина смены',company.switch_reason)}
+          </div>
+        </div>
+        <div class="section-card"><div class="section-title">Статус и ответственность</div>
+          <div class="form-grid form-grid-auto">
+            ${fld('Ответственный',ownerName)}${fld('Источник',srcDict[company.source]||'')}
+            ${fld('Приоритет',PRIORITY_LABELS[company.priority]||'')}
+            ${fld('Дата первого контакта',fmtDate(company.first_contact_at))}
+            ${fld('Следующий шаг',company.next_action_at?`${company.next_action_type?company.next_action_type+', ':''}${fmtDate(company.next_action_at)}`:'')}
+            <div class="field"><div class="field-label">Теги</div>${tags?`<div class="chip-group" style="margin-top:2px">${tags}</div>`:'<span class="field-value empty">—</span>'}</div>
+          </div>
+        </div>
+        <div style="font-size:.72rem;color:var(--text-faint);text-align:right;padding:.25rem .5rem">
+          Создано: ${fmtDateTime(company.created_at)} · Обновлено: ${fmtDateTime(company.updated_at)}
+        </div>
+      `;
+    }
+
+    function buildForm() {
+      const ownerOpts = users.map(u=>`<option value="${u.id}" ${u.id===company.owner_id?'selected':''}>${esc([u.first_name,u.last_name].filter(Boolean).join(' ')||u.email)}</option>`).join('');
+      const segOpts   = Object.entries(SEGMENT_LABELS).map(([v,l])=>`<option value="${v}" ${v===company.segment?'selected':''}>${l}</option>`).join('');
+      const freqOpts  = `<option value="">—</option>`+FREQS.map(o=>`<option value="${o.v}" ${o.v===company.shipment_freq?'selected':''}>${o.l}</option>`).join('');
+      const potOpts   = `<option value="">—</option>`+POTENTIALS.map(o=>`<option value="${o.v}" ${o.v===company.potential?'selected':''}>${o.l}</option>`).join('');
+      const priOpts   = Object.entries(PRIORITY_LABELS).map(([v,l])=>`<option value="${v}" ${v===company.priority?'selected':''}>${l}</option>`).join('');
+      const srcOpts   = `<option value="">—</option>`+SOURCES.map(o=>`<option value="${o.v}" ${o.v===company.source?'selected':''}>${o.l}</option>`).join('');
+
+      const regChips  = REGIONS.map(r=>`<span class="chip${(company.regions||[]).includes(r)?' selected':''}" data-multi="regions" data-val="${esc(r)}">${esc(r)}</span>`).join('');
+      const cargoChips= CARGO_T.map(o=>`<span class="chip${(company.cargo_types||[]).includes(o.v)?' selected':''}" data-multi="cargo_types" data-val="${o.v}">${o.l}</span>`).join('');
+      const dirChips  = DIRS.map(o=>`<span class="chip${(company.directions||[]).includes(o.v)?' selected':''}" data-multi="directions" data-val="${o.v}">${o.l}</span>`).join('');
+      const routeRows = (company.routes||[]).map((r,i)=>`<div class="route-row" data-ri="${i}">
+        <input class="input" data-rf value="${esc(r.from)}" placeholder="Откуда">
+        <span class="route-arr">→</span>
+        <input class="input" data-rt value="${esc(r.to)}" placeholder="Куда">
+        <button class="route-del" data-rdel><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>`).join('');
+      const tagPills  = (company.tags||[]).map(t=>`<span class="tag-pill">${esc(t)}<button data-trm="${esc(t)}">×</button></span>`).join('');
+
+      return `
+        <div class="section-card"><div class="section-title">Основные данные</div>
+          <div class="form-grid form-grid-auto">
+            <div class="field col-span-2"><label class="field-label">Название</label><input id="fldName" class="input" data-fld="name" value="${esc(company.name)}" placeholder="Заполнится автоматически по ИНН"></div>
+            <div class="field col-span-2">
+              <label class="field-label">ИНН <span class="req">*</span> <span style="color:var(--text-faint);font-weight:400">— введите и нажмите «Найти» для автозаполнения</span></label>
+              <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+                <input id="innInput" class="input" data-fld="inn" value="${esc(company.inn)}" placeholder="7707083893" maxlength="12" style="max-width:220px">
+                <button type="button" id="innLookupBtn" class="btn btn-ghost btn-sm">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  Найти по ИНН
+                </button>
+                <span id="innStatus" style="font-size:.78rem;color:var(--text-muted)"></span>
+              </div>
+            </div>
+            <div class="field"><label class="field-label">ОГРН</label><input class="input" data-fld="ogrn" value="${esc(company.ogrn)}"></div>
+            <div class="field"><label class="field-label">Сайт</label><input class="input" data-fld="website" value="${esc(company.website)}" placeholder="example.com"></div>
+            <div class="field"><label class="field-label">Отрасль</label><input class="input" data-fld="industry" value="${esc(company.industry)}"></div>
+            <div class="field col-span-2"><label class="field-label">Юридический адрес</label><input class="input" data-fld="address_legal" value="${esc(company.address_legal)}"></div>
+            <div class="field col-span-2"><label class="field-label">Фактический адрес</label><input class="input" data-fld="address_actual" value="${esc(company.address_actual)}"></div>
+            <div class="field col-span-2"><label class="field-label">Регионы</label><div class="chip-group">${regChips}</div></div>
+            <div class="field col-span-2"><label class="field-label">Описание</label><textarea class="textarea" data-fld="description" rows="3">${esc(company.description)}</textarea></div>
+          </div>
+        </div>
+        <div class="section-card"><div class="section-title">Классификация</div>
+          <div class="form-grid form-grid-auto">
+            <div class="field"><label class="field-label">Сегмент</label><select class="select" data-fld="segment">${segOpts}</select></div>
+            <div class="field"><label class="field-label">Регулярность</label><select class="select" data-fld="shipment_freq">${freqOpts}</select></div>
+            <div class="field"><label class="field-label">Объём в мес.</label><input class="input" data-fld="volume_monthly" value="${esc(company.volume_monthly)}" placeholder="Напр. 200 т / 5 TEU"></div>
+            <div class="field"><label class="field-label">Потенциал</label><select class="select" data-fld="potential">${potOpts}</select></div>
+            <div class="field col-span-2"><label class="field-label">Типы грузов</label><div class="chip-group">${cargoChips}</div></div>
+            <div class="field col-span-2"><label class="field-label">Направления</label><div class="chip-group">${dirChips}</div></div>
+            <div class="field col-span-2"><label class="field-label">Маршруты</label>
+              <div id="routesList">${routeRows}</div>
+              <button class="add-row-btn" id="addRoute" style="margin-top:.5rem">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить маршрут
+              </button>
+            </div>
+            <div class="field"><label class="field-label">Текущий перевозчик</label><input class="input" data-fld="current_carrier" value="${esc(company.current_carrier)}"></div>
+            <div class="field"><label class="field-label">Причина смены</label><input class="input" data-fld="switch_reason" value="${esc(company.switch_reason)}"></div>
+          </div>
+        </div>
+        <div class="section-card"><div class="section-title">Статус</div>
+          <div class="form-grid form-grid-auto">
+            <div class="field"><label class="field-label">Ответственный</label><select class="select" data-fld="owner_id">${ownerOpts}</select></div>
+            <div class="field"><label class="field-label">Источник</label><select class="select" data-fld="source">${srcOpts}</select></div>
+            <div class="field"><label class="field-label">Приоритет</label><select class="select" data-fld="priority">${priOpts}</select></div>
+            <div class="field"><label class="field-label">Первый контакт</label><input type="date" class="input" data-fld="first_contact_at" value="${esc(company.first_contact_at)}"></div>
+            <div class="field"><label class="field-label">Следующий шаг — дата</label><input type="date" class="input" data-fld="next_action_at" value="${esc(company.next_action_at)}"></div>
+            <div class="field"><label class="field-label">Следующий шаг — тип</label>
+              <select class="select" data-fld="next_action_type">
+                <option value="">—</option>
+                <option value="call_out" ${company.next_action_type==='call_out'?'selected':''}>Звонок</option>
+                <option value="email_out" ${company.next_action_type==='email_out'?'selected':''}>Письмо</option>
+                <option value="meeting" ${company.next_action_type==='meeting'?'selected':''}>Встреча</option>
+                <option value="proposal" ${company.next_action_type==='proposal'?'selected':''}>КП</option>
+              </select>
+            </div>
+            <div class="field col-span-2"><label class="field-label">Теги</label>
+              <div class="tags-input" id="tagsInput">${tagPills}<input type="text" id="tagIn" placeholder="Тег + Enter…"></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function wireForm() {
+      const root = document.getElementById('panelOverview');
+      // Простые поля
+      root.addEventListener('input', e => {
+        const fld = e.target.dataset.fld;
+        if (fld) { company[fld] = e.target.value; scheduleSave(); }
+        if (fld === 'name') { document.getElementById('bcName').textContent = company.name||'Новая компания'; document.getElementById('compName').textContent = company.name||'Новая компания'; }
+      });
+      root.addEventListener('change', e => { const f=e.target.dataset.fld; if(f){company[f]=e.target.value;scheduleSave();} });
+      // Чипы
+      root.addEventListener('click', e => {
+        const chip = e.target.closest('.chip[data-multi]');
+        if (chip) { const k=chip.dataset.multi,v=chip.dataset.val,arr=company[k]||(company[k]=[]);const i=arr.indexOf(v);i===-1?arr.push(v):arr.splice(i,1);chip.classList.toggle('selected');scheduleSave(); }
+      });
+      // Маршруты
+      document.getElementById('addRoute')?.addEventListener('click', ()=>{ company.routes=(company.routes||[]);company.routes.push({from:'',to:''});renderOverview(); });
+      root.addEventListener('click', e => { if(e.target.closest('[data-rdel]')){const row=e.target.closest('[data-ri]');company.routes.splice(+row.dataset.ri,1);renderOverview();} });
+      root.addEventListener('input', e => { const row=e.target.closest('[data-ri]');if(!row)return;const i=+row.dataset.ri;if(e.target.matches('[data-rf]'))company.routes[i].from=e.target.value;if(e.target.matches('[data-rt]'))company.routes[i].to=e.target.value;scheduleSave(); });
+      // Теги
+      const tagIn = document.getElementById('tagIn');
+      tagIn?.addEventListener('keydown', e => {
+        if (e.key==='Enter'||e.key===',') { e.preventDefault(); const v=tagIn.value.trim().replace(/^#/,''); if(v&&!(company.tags||[]).includes(v)){company.tags=(company.tags||[]);company.tags.push(v);renderOverview();setTimeout(()=>document.getElementById('tagIn')?.focus(),50);scheduleSave();}else tagIn.value=''; }
+        else if(e.key==='Backspace'&&!tagIn.value&&(company.tags||[]).length){company.tags.pop();renderOverview();setTimeout(()=>document.getElementById('tagIn')?.focus(),50);scheduleSave();}
+      });
+      root.addEventListener('click', e => { const rm=e.target.closest('[data-trm]');if(rm){company.tags=(company.tags||[]).filter(t=>t!==rm.dataset.trm);renderOverview();setTimeout(()=>document.getElementById('tagIn')?.focus(),50);scheduleSave();} });
+
+      // ── ИНН lookup ──────────────────────────────────────────────────────────
+      const REGIONS_LIST = ['Москва','СПб','Центр','Юг','Урал','Сибирь','Дальний Восток','Беларусь','Казахстан','Китай','ЕС','Турция'];
+      const REGION_MAP = {
+        'Москва':'Москва','Московская':'Москва',
+        'Санкт-Петербург':'СПб','Ленинградская':'СПб',
+        'Краснодарский':'Юг','Ростовская':'Юг','Крым':'Юг','Астраханская':'Юг',
+        'Свердловская':'Урал','Челябинская':'Урал','Тюменская':'Урал','Пермский':'Урал',
+        'Новосибирская':'Сибирь','Красноярский':'Сибирь','Омская':'Сибирь','Иркутская':'Сибирь',
+        'Приморский':'Дальний Восток','Хабаровский':'Дальний Восток','Амурская':'Дальний Восток',
+      };
+
+      function setField(selector, value) {
+        const el = root.querySelector(selector);
+        if (el && value) { el.value = value; el.dispatchEvent(new Event('input', { bubbles: true })); }
+      }
+      function setSelect(selector, value) {
+        const el = root.querySelector(selector);
+        if (el && value) { el.value = value; el.dispatchEvent(new Event('change', { bubbles: true })); }
+      }
+
+      function applyLookupResult(data) {
+        // Название — только если поле пустое
+        if (!company.name || company.name === 'Новая компания') {
+          company.name = data.name;
+          document.getElementById('fldName').value = data.name;
+          document.getElementById('bcName').textContent = data.name;
+          document.getElementById('compName').textContent = data.name;
+        }
+        // Прямо пишем в company + обновляем поле
+        const fields = {
+          ogrn:           data.ogrn,
+          address_legal:  data.address_legal,
+          address_actual: data.address_legal,
+          industry:       data.industry,
+        };
+        Object.entries(fields).forEach(([key, val]) => {
+          if (!val) return;
+          company[key] = val;
+          const el = document.querySelector(`[data-fld="${key}"]`);
+          if (el) el.value = val;
+        });
+
+        // Регион → чип
+        if (data.region) {
+        const REGION_MAP = {
+            'Москва':'Москва','Московская':'Москва',
+            'Санкт-Петербург':'СПб','Ленинградская':'СПб',
+            'Краснодарский':'Юг','Ростовская':'Юг','Крым':'Юг',
+            'Свердловская':'Урал','Челябинская':'Урал','Тюменская':'Урал',
+            'Новосибирская':'Сибирь','Красноярский':'Сибирь','Омская':'Сибирь',
+            'Приморский':'Дальний Восток','Хабаровский':'Дальний Восток',
+          };
+          const match = Object.keys(REGION_MAP).find(k => data.region.includes(k));
+          const chip  = match ? REGION_MAP[match] : null;
+          if (chip) {
+            const regions = company.regions || (company.regions = []);
+            if (!regions.includes(chip)) {
+              regions.push(chip);
+              document.querySelectorAll('.chip[data-multi="regions"]').forEach(c => {
+                c.classList.toggle('selected', regions.includes(c.dataset.val));
+              });
+            }
+          }
+        }
+
+        // Теги: директор и ОКВЭД
+        company.tags = company.tags || [];
+        if (data.director_name && !company.tags.includes(data.director_name)) {
+          company.tags.push(data.director_name);
+        }
+        if (data.okved) {
+          const t = 'ОКВЭД ' + data.okved;
+          if (!company.tags.includes(t)) company.tags.push(t);
+        }
+
+        scheduleSave();
+      }
+
+      // Убираем баннер дубля при изменении ИНН
+      document.getElementById('innInput')?.addEventListener('input', () => {
+        document.getElementById('innDupBanner')?.remove();
+      });
+
+      document.getElementById('innLookupBtn')?.addEventListener('click', async () => {
+        const inn = document.getElementById('innInput')?.value.trim().replace(/\D/g,'');
+        const statusEl = document.getElementById('innStatus');
+        if (!inn) { statusEl.textContent = 'Введите ИНН'; statusEl.style.color='var(--error)'; return; }
+        if (!/^\d{10}$|^\d{12}$/.test(inn)) { statusEl.textContent = 'ИНН — 10 или 12 цифр'; statusEl.style.color='var(--error)'; return; }
+
+        const btn = document.getElementById('innLookupBtn');
+        btn.disabled = true;
+        statusEl.style.color = 'var(--text-muted)';
+        statusEl.textContent = '⏳ Ищем…';
+
+        try {
+          const res = await fetch(`/api/lookup/inn/${inn}`, { credentials: 'include' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Ошибка');
+          applyLookupResult(data);
+          statusEl.style.color = 'var(--success)';
+          const status = data.status === 'LIQUIDATED' ? ' ⚠️ ЛИКВИДИРОВАНА' : data.status === 'LIQUIDATING' ? ' ⚠️ В процессе ликвидации' : '';
+          statusEl.textContent = `✓ Найдено: ${data.name}${status}`;
+          toast('Данные загружены из реестра', 'success');
+        } catch(err) {
+          statusEl.style.color = 'var(--error)';
+          statusEl.textContent = '✗ ' + err.message;
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      // Enter в поле ИНН — тоже запускает поиск
+      document.getElementById('innInput')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); document.getElementById('innLookupBtn')?.click(); }
+      });
+    }
+
+    // ── Ошибка дубля ИНН ─────────────────────────────────────────────────────
+    function showInnDupError(err) {
+      // Убираем старый баннер если был
+      document.getElementById('innDupBanner')?.remove();
+
+      const banner = document.createElement('div');
+      banner.id = 'innDupBanner';
+      banner.style.cssText = `
+        background:color-mix(in oklch,var(--error) 8%,var(--surface));
+        border:1px solid color-mix(in oklch,var(--error) 35%,var(--border));
+        border-radius:var(--r-md);padding:.85rem 1rem;
+        display:flex;align-items:flex-start;gap:.75rem;
+        margin-bottom:1rem;
+      `;
+      // Менеджер видит только инфо, ссылку — только head/admin
+      const canSeeCard = can([ROLES.ADMIN, ROLES.HEAD]);
+      const linkOrHint = canSeeCard
+        ? `<a href="/company.html?id=${err.existing_id}"
+              style="font-size:.82em;color:var(--primary);font-weight:500">
+             Открыть карточку →
+           </a>`
+        : `<span style="font-size:.82em;color:var(--text-muted)">
+             Обратитесь к руководителю для объединения или переназначения.
+           </span>`;
+
+      banner.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="2" style="flex-shrink:0;margin-top:1px">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;color:var(--error);font-size:.9em">ИНН уже есть в базе</div>
+          <div style="font-size:.85em;margin-top:.25rem;color:var(--text)">
+            Компания <strong>${err.existing_name||'—'}</strong>
+            · ответственный: <strong>${err.existing_owner||'—'}</strong>
+          </div>
+          <div style="margin-top:.5rem">${linkOrHint}</div>
+        </div>
+        <button onclick="this.parentElement.remove()" style="color:var(--text-faint);padding:.2rem;flex-shrink:0">✕</button>
+      `;
+
+      // Вставляем сразу под topbar / head-card
+      const headCard = document.getElementById('headCard');
+      if (headCard) headCard.after(banner);
+      else document.getElementById('panelOverview')?.prepend(banner);
+
+      // Скролл к баннеру
+      banner.scrollIntoView({ behavior:'smooth', block:'start' });
+    }
+
+    // ── Mode
+    function applyMode() {
+      document.getElementById('btnEdit').hidden   = isEditing||isNew;
+      document.getElementById('btnSave').hidden   = !isEditing;
+      document.getElementById('btnCancel').hidden = !isEditing;
+      document.getElementById('btnDelete').hidden = isEditing||isNew||!can([ROLES.ADMIN,ROLES.HEAD]);
+      document.getElementById('draftInd').hidden  = !isEditing;
+    }
+
+    // ── Buttons
+    document.getElementById('btnEdit').addEventListener('click', ()=>{ isEditing=true;renderOverview();applyMode(); });
+    document.getElementById('btnCancel').addEventListener('click', async ()=>{
+      if(isNew){if(confirm('Отменить?'))location.href='/companies.html';return;}
+      clearDraft();isEditing=false;company=await getCompany(company.id);renderHead();renderOverview();applyMode();
+    });
+    document.getElementById('btnSave').addEventListener('click', async ()=>{
+      const innVal = (company.inn || '').replace(/\D/g,'');
+      if(!innVal){toast('Введите ИНН','error');document.getElementById('innInput')?.focus();return;}
+      if(innVal.length!==10 && innVal.length!==12){toast('ИНН должен содержать 10 или 12 цифр','error');document.getElementById('innInput')?.focus();return;}
+      document.getElementById('btnSave').disabled=true;
+      try {
+        if(isNew){
+          const c=await createCompany(company);
+          clearDraft();toast('Компания создана','success');
+          location.href=`/company.html?id=${c.id}`;
+        } else {
+          company=await updateCompany(company.id,company);
+          clearDraft();isEditing=false;renderHead();renderOverview();applyMode();
+          toast('Сохранено','success');
+        }
+      } catch(err){
+        if(err.existing_id){
+          // Дубль ИНН — показываем чёткое сообщение, не даём создать
+          showInnDupError(err);
+        } else {
+          toast(err.message,'error');
+        }
+      }
+      finally{document.getElementById('btnSave').disabled=false;}
+    });
+    document.getElementById('btnDelete').addEventListener('click', async ()=>{
+      if(!confirm(`Удалить компанию «${company.name}»?`))return;
+      try{await deleteCompany(company.id);toast('Удалено');setTimeout(()=>location.href='/companies.html',600);}
+      catch(err){toast(err.message,'error');}
+    });
+
+    // ── Autosave
+    let saveTimer=null;
+    const draftKey = ()=>`lcrm:draft:${isNew?'new':company.id}`;
+    function scheduleSave(){
+      if(!isEditing)return;
+      const ind=document.getElementById('draftInd');ind.textContent='● сохраняем…';ind.className='draft-indicator saving';ind.hidden=false;
+      clearTimeout(saveTimer);
+      saveTimer=setTimeout(()=>{ try{sessionStorage.setItem(draftKey(),JSON.stringify(company));}catch{} ind.textContent='● черновик';ind.className='draft-indicator saved'; },600);
+    }
+    function clearDraft(){try{sessionStorage.removeItem(draftKey());}catch{} const ind=document.getElementById('draftInd');ind.textContent='';ind.hidden=true;}
+    if(isEditing){try{const r=sessionStorage.getItem(draftKey());if(r&&confirm('Найден черновик. Восстановить?')){company={...company,...JSON.parse(r)};renderHead();renderOverview();}else clearDraft();}catch{}}
+
+    // ── Tabs
+    document.querySelectorAll('.tab').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t===btn));
+        document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===btn.dataset.tab));
+      });
+    });
+
+    // ── Contacts
+    async function loadContacts() {
+      if(!company.id){document.getElementById('contactsList').innerHTML='<div class="empty-mini">Сначала сохраните компанию.</div>';return;}
+      contacts=await getContacts(company.id);
+      document.getElementById('cntContacts').textContent=contacts.length;
+      // update act form select
+      document.getElementById('actContact').innerHTML='<option value="">— не выбран —</option>'+contacts.map(c=>`<option value="${c.id}">${esc(getContactFullName(c))}</option>`).join('');
+      if(!contacts.length){document.getElementById('contactsList').innerHTML=`<div class="empty-state"><svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg><h3>Контактов нет</h3><p>Добавьте ЛПР или менеджера компании.</p></div>`;return;}
+      document.getElementById('contactsList').innerHTML = contacts.map(c=>{
+        const ini=((c.first_name?.[0]||'')+(c.last_name?.[0]||'')).toUpperCase()||'?';
+        const roleLbl=CONTACT_ROLE_LABELS[c.role]||'';
+        const roleColor=c.role==='lpr'?'red':c.role==='blocker'?'orange':'gray';
+        const chs=[];
+        if(c.phone_main)chs.push(`<span>📞 <a href="tel:${esc(c.phone_main)}">${esc(c.phone_main)}</a></span>`);
+        if(c.email)chs.push(`<span>✉️ <a href="mailto:${esc(c.email)}">${esc(c.email)}</a></span>`);
+        if(c.telegram)chs.push(`<span>✈️ ${esc(c.telegram)}</span>`);
+        return `<div class="contact-card" data-cid="${c.id}">
+          <div class="contact-ava">${ini}</div>
+          <div class="contact-body">
+            <div class="contact-name-row">
+              <span class="contact-name">${esc(getContactFullName(c))}</span>
+              ${c.position?`<span class="contact-pos">— ${esc(c.position)}</span>`:''}
+              ${c.role&&c.role!=='unknown'?`<span class="badge badge-${roleColor}"><span class="badge-dot"></span>${roleLbl}</span>`:''}
+            </div>
+            ${chs.length?`<div class="contact-channels">${chs.join('')}</div>`:''}
+            ${c.notes?`<div style="margin-top:.3rem;font-size:.75rem;color:var(--text-muted)">${esc(c.notes)}</div>`:''}
+          </div>
+          <div class="contact-actions">
+            <button class="icon-btn" data-cedit="${c.id}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button class="icon-btn danger" data-cdel="${c.id}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg></button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // Modal contact
+    const ctModal = document.getElementById('contactModal');
+    function openCtModal(c=null) {
+      document.getElementById('ctTitle').textContent = c ? 'Редактировать контакт' : 'Новый контакт';
+      document.getElementById('ctId').value    = c?.id??'';
+      document.getElementById('ctFirst').value = c?.first_name??'';
+      document.getElementById('ctLast').value  = c?.last_name??'';
+      document.getElementById('ctPos').value   = c?.position??'';
+      document.getElementById('ctRole').value  = c?.role??'unknown';
+      document.getElementById('ctPhone').value = c?.phone_main??'';
+      document.getElementById('ctEmail').value = c?.email??'';
+      document.getElementById('ctTg').value    = c?.telegram??'';
+      document.getElementById('ctWa').value    = c?.whatsapp??'';
+      document.getElementById('ctChan').value  = c?.preferred_channel??'';
+      document.getElementById('ctNotes').value = c?.notes??'';
+      ctModal.classList.add('open');
+      setTimeout(()=>document.getElementById('ctFirst').focus(),50);
+    }
+    function closeCtModal(){ctModal.classList.remove('open');}
+    ctModal.addEventListener('click',e=>{if(e.target===ctModal)closeCtModal();});
+    document.getElementById('ctCancel').addEventListener('click',closeCtModal);
+    document.getElementById('btnAddContact').addEventListener('click',()=>{if(!company.id){toast('Сначала сохраните компанию','error');return;}openCtModal(null);});
+    document.getElementById('contactsList').addEventListener('click',async e=>{
+      const editId=e.target.closest('[data-cedit]')?.dataset.cedit;
+      const delId=e.target.closest('[data-cdel]')?.dataset.cdel;
+      if(editId){const c=contacts.find(x=>x.id===editId);if(c)openCtModal(c);}
+      else if(delId){if(!confirm('Удалить контакт?'))return;try{await deleteContact(delId);await loadContacts();toast('Удалён');}catch(err){toast(err.message,'error');}}
+    });
+    document.getElementById('ctSave').addEventListener('click',async()=>{
+      const id=document.getElementById('ctId').value;
+      const data={company_id:company.id,first_name:document.getElementById('ctFirst').value,last_name:document.getElementById('ctLast').value,position:document.getElementById('ctPos').value,role:document.getElementById('ctRole').value,phone_main:document.getElementById('ctPhone').value,email:document.getElementById('ctEmail').value,telegram:document.getElementById('ctTg').value,whatsapp:document.getElementById('ctWa').value,preferred_channel:document.getElementById('ctChan').value,notes:document.getElementById('ctNotes').value};
+      try{if(id)await updateContact(id,data);else await createContact(data);closeCtModal();await loadContacts();toast(id?'Обновлён':'Добавлен','success');}
+      catch(err){toast(err.message,'error');}
+    });
+
+    // ── Deals tab
+    async function loadDeals() {
+      if(!company.id){document.getElementById('dealsList').innerHTML='<div class="empty-mini">Сначала сохраните компанию.</div>';return;}
+      try{
+        const deals=await getDealsByCompany(company.id);
+        document.getElementById('cntDeals').textContent=deals.length;
+        if(!deals.length){document.getElementById('dealsList').innerHTML=`<div class="empty-state"><svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><h3>Сделок нет</h3><p>Создайте первую сделку по этой компании.</p><a href="/deals.html?new=1&company_id=${company.id}" class="btn btn-primary btn-sm">Создать сделку</a></div>`;return;}
+        document.getElementById('dealsList').innerHTML = deals.map(d=>`<a href="/deals.html?id=${d.id}" class="contact-card" style="text-decoration:none">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:.9em">${esc(d.title)}</div>
+            <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">Стадия: ${esc(d.stage)} · ${d.planned_revenue?d.planned_revenue+' ₽':''}</div>
+          </div>
+          <span class="badge badge-${d.outcome==='won'?'green':d.outcome==='lost'?'red':d.outcome==='postponed'?'orange':'gray'}"><span class="badge-dot"></span>${d.outcome}</span>
+        </a>`).join('');
+      }catch(err){document.getElementById('dealsList').innerHTML=`<div class="empty-mini">${esc(err.message)}</div>`;}
+    }
+    document.querySelectorAll('.tab').forEach(btn=>{
+      if(btn.dataset.tab==='deals') btn.addEventListener('click',loadDeals,{once:true});
+    });
+
+    
+
+    // Set datetime default
+    {const n=new Date();const tz=n.getTime()-n.getTimezoneOffset()*60000;document.getElementById('actOccurred').value=new Date(tz).toISOString().slice(0,16);}
+
+    document.getElementById('actSubmit').addEventListener('click',async()=>{
+      if(!company.id){toast('Сначала сохраните компанию','error');return;}
+      try{
+        await createActivity({company_id:company.id,type:document.getElementById('actType').value,occurred_at:document.getElementById('actOccurred').value?new Date(document.getElementById('actOccurred').value).toISOString():new Date().toISOString(),contact_id:document.getElementById('actContact').value||null,description:document.getElementById('actDesc').value,next_step:document.getElementById('actNextStep').value,next_step_due:document.getElementById('actNextDue').value});
+        document.getElementById('actDesc').value='';document.getElementById('actNextStep').value='';document.getElementById('actNextDue').value='';document.getElementById('actContact').value='';
+        await loadActivities();toast('Добавлено','success');
+      }catch(err){toast(err.message,'error');}
+    });
+    document.getElementById('actReset').addEventListener('click',()=>{document.getElementById('actType').value='call_out';document.getElementById('actDesc').value='';document.getElementById('actNextStep').value='';document.getElementById('actNextDue').value='';document.getElementById('actContact').value='';const n=new Date();const tz=n.getTime()-n.getTimezoneOffset()*60000;document.getElementById('actOccurred').value=new Date(tz).toISOString().slice(0,16);});
+
+    document.querySelector('[data-panel="activities"]').addEventListener('click',async e=>{
+      const delId=e.target.closest('[data-adel]')?.dataset.adel;
+      const doneId=e.target.closest('[data-done]')?.dataset.done;
+      if(delId){if(!confirm('Удалить активность?'))return;try{await deleteActivity(delId);await loadActivities();toast('Удалено');}catch(err){toast(err.message,'error');}}
+      else if(doneId){try{const list=await getActivitiesByCompany(company.id);const a=list.find(x=>x.id===doneId);await markDone(doneId,!a.is_done);await loadActivities();}catch(err){toast(err.message,'error');}}
+    });
+
+    // ── Keyboard
+    document.addEventListener('keydown',e=>{
+      if((e.metaKey||e.ctrlKey)&&e.key==='s'&&isEditing){e.preventDefault();document.getElementById('btnSave').click();}
+      if(e.key==='Escape'){if(ctModal.classList.contains('open'))closeCtModal();}
+    });
+    window.addEventListener('beforeunload',e=>{if(isEditing&&(isNew||sessionStorage.getItem(draftKey()))){e.preventDefault();e.returnValue='';}});
+  </script>
+</body>
+</html>

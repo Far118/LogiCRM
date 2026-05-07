@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <title>Импорт — LogiCRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <!-- SheetJS для парсинга Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    html { visibility: hidden; }
+    /* ── Drop zone ── */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--r-xl);
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color var(--t), background var(--t);
+      background: var(--surface);
+    }
+    .drop-zone:hover,
+    .drop-zone.drag-over {
+      border-color: var(--primary);
+      background: var(--primary-subtle);
+    }
+    .drop-icon { width: 48px; height: 48px; color: var(--text-faint); margin: 0 auto 1rem; }
+    .drop-title { font-size: 1.1rem; font-weight: 600; margin-bottom: .4rem; }
+    .drop-sub   { font-size: .88rem; color: var(--text-muted); }
+
+    /* ── Steps ── */
+    .steps {
+      display: flex; align-items: center; gap: 0;
+      margin-bottom: 1.5rem;
+    }
+    .step {
+      display: flex; align-items: center; gap: .5rem;
+      font-size: .82rem; font-weight: 500; color: var(--text-faint);
+    }
+    .step-num {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: var(--surface-off); color: var(--text-faint);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .75rem; font-weight: 700; flex-shrink: 0;
+    }
+    .step.active .step-num { background: var(--primary); color: #fff; }
+    .step.active { color: var(--text); }
+    .step.done .step-num { background: var(--success); color: #fff; }
+    .step.done { color: var(--text-muted); }
+    .step-line { flex: 1; height: 1px; background: var(--border); margin: 0 .5rem; min-width: 24px; }
+
+    /* ── Mapping ── */
+    .mapping-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: .65rem;
+    }
+    .map-row {
+      display: flex; align-items: center; gap: .5rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r-md); padding: .5rem .75rem;
+    }
+    .map-field { font-size: .82rem; font-weight: 500; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .map-field .req { color: var(--error); }
+    .map-arrow { color: var(--text-faint); flex-shrink: 0; font-size: 1rem; }
+    .map-select { font-size: .8rem; border: 1px solid var(--border); border-radius: var(--r-sm); padding: .25rem .4rem; background: var(--bg); color: var(--text); outline: none; min-width: 140px; }
+    .map-select:focus { border-color: var(--primary); }
+
+    /* ── Preview table ── */
+    .preview-wrap { overflow-x: auto; max-height: 320px; overflow-y: auto; }
+    .preview-table { font-size: .78rem; width: 100%; }
+    .preview-table th {
+      padding: .4rem .65rem;
+      background: var(--surface-off);
+      border-bottom: 1px solid var(--divider);
+      text-align: left; white-space: nowrap;
+      position: sticky; top: 0; z-index: 1;
+      font-size: .7rem; text-transform: uppercase;
+      letter-spacing: .04em; color: var(--text-muted);
+    }
+    .preview-table td {
+      padding: .4rem .65rem;
+      border-bottom: 1px solid var(--divider);
+      max-width: 180px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+    .preview-table tr.error-row td { background: color-mix(in oklch, var(--error) 6%, var(--surface)); }
+    .preview-table .cell-empty { color: var(--text-faint); font-style: italic; }
+    .preview-table .cell-ok    { color: var(--success); }
+    .preview-table .cell-warn  { color: var(--warning); }
+    .preview-table .cell-err   { color: var(--error); font-weight: 500; }
+
+    /* ── Result ── */
+    .result-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: .75rem; margin-bottom: 1.25rem;
+    }
+    .result-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r-lg); padding: 1rem;
+      text-align: center;
+    }
+    .result-num  { font-size: 2rem; font-weight: 700; line-height: 1; }
+    .result-lbl  { font-size: .75rem; color: var(--text-muted); margin-top: .3rem; }
+    .result-card.green .result-num { color: var(--success); }
+    .result-card.blue  .result-num { color: var(--primary); }
+    .result-card.orange.result-num { color: var(--warning); }
+    .result-card.red   .result-num { color: var(--error); }
+
+    .error-list {
+      background: color-mix(in oklch, var(--error) 6%, var(--surface));
+      border: 1px solid color-mix(in oklch, var(--error) 25%, var(--border));
+      border-radius: var(--r-md); padding: .75rem 1rem;
+      font-size: .82rem; max-height: 200px; overflow-y: auto;
+    }
+    .error-list li { margin-bottom: .25rem; color: var(--error); }
+    .error-list li span { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <h1 class="topbar-title">Импорт компаний</h1>
+      <a href="/companies.html" class="btn btn-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        К компаниям
+      </a>
+    </header>
+
+    <div class="content">
+      <!-- Шаги -->
+      <div class="steps" id="stepsBar">
+        <div class="step active" id="step1"><div class="step-num">1</div>Загрузка файла</div>
+        <div class="step-line"></div>
+        <div class="step" id="step2"><div class="step-num">2</div>Маппинг колонок</div>
+        <div class="step-line"></div>
+        <div class="step" id="step3"><div class="step-num">3</div>Предпросмотр</div>
+        <div class="step-line"></div>
+        <div class="step" id="step4"><div class="step-num">4</div>Готово</div>
+      </div>
+
+      <!-- Шаг 1: Загрузка файла -->
+      <div id="panelUpload">
+        <div class="section-card">
+          <div class="drop-zone" id="dropZone">
+            <svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <div class="drop-title">Перетащите файл сюда</div>
+            <div class="drop-sub">или нажмите для выбора</div>
+            <div class="drop-sub" style="margin-top:.5rem">Поддерживаются: <strong>.xlsx, .xls, .csv</strong> · до 5000 строк</div>
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
+          </div>
+        </div>
+
+        <div class="section-card">
+          <div class="section-title">Шаблон для заполнения</div>
+          <p style="font-size:.88em;color:var(--text-muted);margin-bottom:.75rem">
+            Скачайте шаблон с правильными заголовками и примером заполнения.
+          </p>
+          <a href="/api/import/template" class="btn btn-ghost">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Скачать шаблон CSV
+          </a>
+          <div style="margin-top:1rem">
+            <div class="section-title" style="margin-bottom:.5rem">Обязательные колонки</div>
+            <div class="chip-group">
+              <span class="chip chip-readonly selected">inn</span>
+            </div>
+            <div class="section-title" style="margin:.75rem 0 .5rem">Рекомендуемые</div>
+            <div class="chip-group">
+              <span class="chip chip-readonly">name</span>
+              <span class="chip chip-readonly">segment</span>
+              <span class="chip chip-readonly">priority</span>
+              <span class="chip chip-readonly">contact_name</span>
+              <span class="chip chip-readonly">contact_phone</span>
+              <span class="chip chip-readonly">industry</span>
+              <span class="chip chip-readonly">regions</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Шаг 2: Маппинг -->
+      <div id="panelMapping" style="display:none">
+        <div class="section-card">
+          <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+            <div style="flex:1">
+              <div style="font-weight:600;margin-bottom:.2rem" id="fileInfo"></div>
+              <div style="font-size:.82rem;color:var(--text-muted)" id="rowsInfo"></div>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="btnReupload">Выбрать другой файл</button>
+          </div>
+          <div class="section-title">Сопоставьте колонки файла с полями CRM</div>
+          <div class="mapping-grid" id="mappingGrid"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.88em">
+            <input type="checkbox" id="updateExisting"> Обновлять существующие компании по ИНН
+          </label>
+          <div style="flex:1"></div>
+          <button class="btn btn-ghost" id="btnBack1">Назад</button>
+          <button class="btn btn-primary" id="btnPreview">Предпросмотр →</button>
+        </div>
+      </div>
+
+      <!-- Шаг 3: Предпросмотр -->
+      <div id="panelPreview" style="display:none">
+        <div class="section-card">
+          <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem">
+            <div class="section-title" style="margin:0;flex:1">Предпросмотр данных</div>
+            <span id="previewStats" style="font-size:.82rem;color:var(--text-muted)"></span>
+          </div>
+          <div class="table-wrap">
+            <div class="preview-wrap">
+              <table class="preview-table" id="previewTable"></table>
+            </div>
+          </div>
+        </div>
+
+        <div id="errorsBlock" style="display:none;margin-bottom:1rem">
+          <div style="font-weight:600;color:var(--error);margin-bottom:.5rem" id="errTitle"></div>
+          <ul class="error-list" id="errList"></ul>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:.75rem">
+          <div style="flex:1"></div>
+          <button class="btn btn-ghost" id="btnBack2">Назад</button>
+          <button class="btn btn-primary" id="btnImport">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Импортировать
+          </button>
+        </div>
+      </div>
+
+      <!-- Шаг 4: Результат -->
+      <div id="panelResult" style="display:none">
+        <div class="section-card">
+          <div class="result-grid" id="resultGrid"></div>
+          <div id="importErrors" style="display:none">
+            <div style="font-weight:600;color:var(--error);margin-bottom:.5rem">Ошибки при импорте:</div>
+            <ul class="error-list" id="importErrList"></ul>
+          </div>
+          <div style="display:flex;gap:.75rem;margin-top:.75rem">
+            <a href="/companies.html" class="btn btn-primary">Открыть компании</a>
+            <button class="btn btn-ghost" id="btnImportMore">Импортировать ещё</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    import { initUI, esc, toast } from '/js/ui.js';
+    import { dbGetAll } from '/js/db.js';
+
+    const session = await initUI({ active: 'import' });
+    if (!session) throw new Error('no session');
+
+    // ── Поля CRM → описание ────────────────────────────────────────────────────
+    const CRM_FIELDS = [
+      { key:'inn',               label:'ИНН',               req:true  },
+      { key:'name',              label:'Название'                        },
+      { key:'ogrn',              label:'ОГРН'                          },
+      { key:'website',           label:'Сайт'                          },
+      { key:'address_legal',     label:'Юр. адрес'                     },
+      { key:'industry',          label:'Отрасль'                       },
+      { key:'segment',           label:'Сегмент'                       },
+      { key:'priority',          label:'Приоритет'                     },
+      { key:'source',            label:'Источник'                      },
+      { key:'cargo_types',       label:'Типы грузов'                   },
+      { key:'directions',        label:'Направления'                   },
+      { key:'regions',           label:'Регионы'                       },
+      { key:'shipment_freq',     label:'Регулярность'                  },
+      { key:'volume_monthly',    label:'Объём в мес.'                  },
+      { key:'current_carrier',   label:'Текущий перевозчик'            },
+      { key:'contact_name',      label:'Контакт — ФИО'                 },
+      { key:'contact_phone',     label:'Контакт — телефон'             },
+      { key:'contact_email',     label:'Контакт — email'               },
+      { key:'contact_position',  label:'Контакт — должность'           },
+      { key:'description',       label:'Описание'                      },
+      { key:'tags',              label:'Теги'                          },
+    ];
+
+    let rawData    = [];   // все строки из файла
+    let fileHeaders= [];   // заголовки из файла
+    let mapping    = {};   // { crmKey: fileColumnIndex }
+    let fileName   = '';
+
+    // ── Шаги ──────────────────────────────────────────────────────────────────
+    function setStep(n) {
+      for (let i=1; i<=4; i++) {
+        const s = document.getElementById('step'+i);
+        s.classList.toggle('active', i === n);
+        s.classList.toggle('done',   i < n);
+      }
+      ['panelUpload','panelMapping','panelPreview','panelResult'].forEach((id,idx) => {
+        document.getElementById(id).style.display = idx+1 === n ? 'block' : 'none';
+      });
+    }
+
+    // ── Загрузка файла ────────────────────────────────────────────────────────
+    const dropZone  = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault(); dropZone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) processFile(file);
+    });
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) processFile(fileInput.files[0]);
+    });
+
+    function processFile(file) {
+      fileName = file.name;
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (!['xlsx','xls','csv'].includes(ext)) {
+        toast('Поддерживаются только .xlsx, .xls, .csv', 'error'); return;
+      }
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const wb = XLSX.read(e.target.result, { type:'binary', cellDates:true });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const data = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+          if (!data.length) { toast('Файл пустой', 'error'); return; }
+
+          fileHeaders = data[0].map(h => String(h).trim());
+          rawData = data.slice(1).filter(row => row.some(cell => String(cell).trim()));
+
+          if (!rawData.length) { toast('В файле нет данных (только заголовки)', 'error'); return; }
+          if (rawData.length > 5000) { toast('Максимум 5000 строк. В файле: ' + rawData.length, 'error'); return; }
+
+          buildMapping();
+          setStep(2);
+        } catch(err) {
+          toast('Ошибка чтения файла: ' + err.message, 'error');
+        }
+      };
+      reader.readAsBinaryString(file);
+    }
+
+    // ── Автоматический маппинг ────────────────────────────────────────────────
+    const AUTO_MAP = {
+      name:['название','name','компания','company','наименование','организация'],
+      inn:['инн','inn','иnn'],
+      ogrn:['огрн','ogrn'],
+      website:['сайт','website','url','web'],
+      address_legal:['адрес','address','юр адрес','юридический адрес','address_legal'],
+      industry:['отрасль','industry','сфера деятельности'],
+      segment:['сегмент','segment','статус'],
+      priority:['приоритет','priority'],
+      source:['источник','source'],
+      cargo_types:['тип груза','типы грузов','cargo','cargo_type','cargo_types'],
+      directions:['направления','directions','direction'],
+      regions:['регионы','regions','region','регион'],
+      shipment_freq:['частота','периодичность','freq','shipment_freq','регулярность'],
+      volume_monthly:['объём','объем','volume','volume_monthly','объём в мес'],
+      current_carrier:['перевозчик','current_carrier','текущий перевозчик'],
+      contact_name:['контакт','contact','фио','contact_name','имя контакта'],
+      contact_phone:['телефон','phone','contact_phone','тел'],
+      contact_email:['email','почта','contact_email','e-mail'],
+      contact_position:['должность','position','contact_position'],
+      description:['описание','description','комментарий','примечание'],
+      tags:['теги','tags','метки'],
+    };
+
+    function buildMapping() {
+      mapping = {};
+      const headersLower = fileHeaders.map(h => h.toLowerCase().trim());
+
+      CRM_FIELDS.forEach(field => {
+        const synonyms = AUTO_MAP[field.key] || [field.key];
+        const idx = headersLower.findIndex(h => synonyms.some(s => h === s || h.includes(s)));
+        if (idx !== -1) mapping[field.key] = idx;
+      });
+
+      renderMappingUI();
+    }
+
+    function renderMappingUI() {
+      document.getElementById('fileInfo').textContent = `📄 ${fileName}`;
+      document.getElementById('rowsInfo').textContent = `${rawData.length} строк данных · ${fileHeaders.length} колонок`;
+
+      const colOpts = `<option value="">— не импортировать —</option>` +
+        fileHeaders.map((h,i) => `<option value="${i}">${esc(h)}</option>`).join('');
+
+      document.getElementById('mappingGrid').innerHTML = CRM_FIELDS.map(field => `
+        <div class="map-row">
+          <div class="map-field">${esc(field.label)}${field.req ? ' <span class="req">*</span>' : ''}</div>
+          <span class="map-arrow">→</span>
+          <select class="map-select" data-field="${field.key}">
+            ${colOpts}
+          </select>
+        </div>`).join('');
+
+      // Применяем автомаппинг
+      Object.entries(mapping).forEach(([key, idx]) => {
+        const sel = document.querySelector(`[data-field="${key}"]`);
+        if (sel) sel.value = String(idx);
+      });
+    }
+
+    function readCurrentMapping() {
+      mapping = {};
+      document.querySelectorAll('.map-select').forEach(sel => {
+        if (sel.value !== '') mapping[sel.dataset.field] = parseInt(sel.value);
+      });
+    }
+
+    // ── Предпросмотр ──────────────────────────────────────────────────────────
+    document.getElementById('btnPreview').addEventListener('click', () => {
+      readCurrentMapping();
+      if (mapping.inn === undefined) {
+        toast('Необходимо сопоставить колонку "ИНН"', 'error'); return;
+      }
+      buildPreview();
+      setStep(3);
+    });
+
+    function buildPreview() {
+      const PREVIEW_ROWS = 50;
+      const mappedKeys = Object.keys(mapping);
+      const displayKeys = mappedKeys.filter(k =>
+        ['name','inn','segment','priority','industry','contact_name','contact_phone','regions'].includes(k)
+      );
+      if (!displayKeys.includes('name')) displayKeys.unshift('name');
+
+      // Заголовки
+      const thead = `<thead><tr>${displayKeys.map(k => {
+        const f = CRM_FIELDS.find(f=>f.key===k);
+        return `<th>${esc(f?.label||k)}</th>`;
+      }).join('')}<th>Статус</th></tr></thead>`;
+
+      // Строки
+      let validCount = 0, errorCount = 0;
+      const errorsFound = [];
+
+      const rows = rawData.slice(0, PREVIEW_ROWS).map((row, i) => {
+        const cells = displayKeys.map(k => {
+          const idx = mapping[k];
+          const val = idx !== undefined ? String(row[idx] ?? '').trim() : '';
+          const cls = !val ? 'cell-empty' : '';
+          return `<td class="${cls}">${val ? esc(val) : '—'}</td>`;
+        });
+
+        const inn  = String(mapping.inn !== undefined ? row[mapping.inn] ?? '' : '').replace(/\D/g,'');
+        const name = String(mapping.name !== undefined ? row[mapping.name] ?? '' : '').trim();
+        let status = '<span style="color:var(--success)">✓</span>';
+        let rowClass = '';
+
+        if (!inn) {
+          status = '<span class="cell-err">✗ нет ИНН</span>';
+          rowClass = 'error-row';
+          errorCount++;
+          errorsFound.push(`Строка ${i+2}: нет ИНН`);
+        } else if (inn.length !== 10 && inn.length !== 12) {
+          status = '<span class="cell-err">✗ ИНН ${inn}</span>';
+          rowClass = 'error-row';
+          errorCount++;
+          errorsFound.push(`Строка ${i+2}: некорректный ИНН "${inn}" (нужно 10 или 12 цифр)`);
+        } else if (!name) {
+          status = '<span style="color:var(--warning)">⚠ без названия</span>';
+          errorsFound.push(`Строка ${i+2}: нет названия — будет заполнено как "Компания ИНН ${inn}"`);
+          validCount++;
+        } else {
+          validCount++;
+        }
+
+        return `<tr class="${rowClass}">${cells.join('')}<td>${status}</td></tr>`;
+      }).join('');
+
+      const moreRows = rawData.length > PREVIEW_ROWS
+        ? `<tr><td colspan="${displayKeys.length+1}" style="padding:.5rem 1rem;color:var(--text-faint);font-size:.78rem">… ещё ${rawData.length - PREVIEW_ROWS} строк не показаны</td></tr>`
+        : '';
+
+      document.getElementById('previewTable').innerHTML = thead + `<tbody>${rows}${moreRows}</tbody>`;
+      document.getElementById('previewStats').textContent =
+        `${rawData.length} строк · ${validCount} корректных · ${errorCount} с ошибками`;
+
+      // Ошибки
+      if (errorsFound.length) {
+        document.getElementById('errorsBlock').style.display = 'block';
+        document.getElementById('errTitle').textContent = `Найдено проблем: ${errorsFound.length}`;
+        document.getElementById('errList').innerHTML = errorsFound.slice(0,20)
+          .map(e => `<li>${esc(e)}</li>`).join('');
+      } else {
+        document.getElementById('errorsBlock').style.display = 'none';
+      }
+
+      // Блокируем кнопку если слишком много ошибок
+      const tooManyErrors = errorCount > rawData.length * 0.5;
+      document.getElementById('btnImport').disabled = tooManyErrors;
+      if (tooManyErrors) toast('Слишком много строк без ИНН или с некорректным ИНН', 'error');
+    }
+
+    // ── Импорт ────────────────────────────────────────────────────────────────
+    document.getElementById('btnImport').addEventListener('click', async () => {
+      const btn = document.getElementById('btnImport');
+      btn.disabled = true;
+      btn.textContent = 'Импортируем…';
+
+      try {
+        // Преобразуем строки в объекты
+        const rows = rawData.map(row => {
+          const obj = {};
+          CRM_FIELDS.forEach(field => {
+            if (mapping[field.key] !== undefined) {
+              obj[field.key] = String(row[mapping[field.key]] ?? '').trim();
+            }
+          });
+          return obj;
+        }).filter(obj => obj.inn);
+
+        const users = await fetch('/api/users', {credentials:'include'}).then(r=>r.json()).catch(()=>[]);
+        const ownerId = session.id;
+
+        const res = await fetch('/api/import/companies', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rows,
+            owner_id: ownerId,
+            update_existing: document.getElementById('updateExisting').checked,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Ошибка импорта');
+
+        showResult(data);
+        setStep(4);
+      } catch(err) {
+        toast(err.message, 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:15px;height:15px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Импортировать';
+      }
+    });
+
+    function showResult(data) {
+      document.getElementById('resultGrid').innerHTML = `
+        <div class="result-card green">
+          <div class="result-num">${data.created}</div>
+          <div class="result-lbl">Создано</div>
+        </div>
+        <div class="result-card blue">
+          <div class="result-num">${data.updated}</div>
+          <div class="result-lbl">Обновлено</div>
+        </div>
+        <div class="result-card">
+          <div class="result-num">${data.skipped}</div>
+          <div class="result-lbl">Пропущено (дубли)</div>
+        </div>
+        <div class="result-card ${data.contacts>0?'blue':''}">
+          <div class="result-num">${data.contacts}</div>
+          <div class="result-lbl">Контактов добавлено</div>
+        </div>
+        ${data.errors?.length ? `<div class="result-card red">
+          <div class="result-num">${data.errors.length}</div>
+          <div class="result-lbl">Ошибок</div>
+        </div>` : ''}
+      `;
+
+      if (data.errors?.length) {
+        document.getElementById('importErrors').style.display = 'block';
+        document.getElementById('importErrList').innerHTML = data.errors
+          .map(e => `<li>Строка ${e.line}: ${esc(e.msg)} <span>(поле: ${e.field})</span></li>`)
+          .join('');
+      }
+    }
+
+    // ── Навигация ─────────────────────────────────────────────────────────────
+    document.getElementById('btnReupload').addEventListener('click', () => {
+      fileInput.value = ''; fileInput.click();
+    });
+    document.getElementById('btnBack1').addEventListener('click', () => setStep(1));
+    document.getElementById('btnBack2').addEventListener('click', () => setStep(2));
+    document.getElementById('btnImportMore').addEventListener('click', () => {
+      rawData = []; fileHeaders = []; mapping = {};
+      fileInput.value = '';
+      setStep(1);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <style>html{visibility:hidden}</style>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Сделки — LogiCRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    /* ── Kanban ── */
+    .kanban { display: flex; gap: .65rem; padding: 1rem 1.5rem; overflow-x: auto; overflow-y: hidden; flex: 1; min-height: 0; }
+    .kb-col { width: 230px; flex-shrink: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); display: flex; flex-direction: column; max-height: 100%; overflow: hidden; }
+    .kb-head { padding: .55rem .8rem; border-bottom: 1px solid var(--divider); display: flex; align-items: center; gap: .4rem; flex-shrink: 0; }
+    .kb-stripe { width: 18px; height: 3px; border-radius: var(--r-full); flex-shrink: 0; }
+    .kb-stripe.gray   { background: var(--text-faint); }
+    .kb-stripe.blue   { background: var(--blue); }
+    .kb-stripe.orange { background: var(--orange); }
+    .kb-stripe.teal   { background: var(--primary); }
+    .kb-stripe.green  { background: var(--success); }
+    .kb-name  { font-size: .78rem; font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .kb-count { font-size: .68rem; background: var(--surface-off); padding: 0 .35rem; border-radius: var(--r-full); color: var(--text-muted); }
+    .kb-body  { flex: 1; padding: .4rem; overflow-y: auto; display: flex; flex-direction: column; gap: .35rem; min-height: 40px; }
+    .kb-body.drag-over { background: var(--primary-subtle); outline: 2px dashed var(--primary); outline-offset: -4px; }
+    .kb-sum   { padding: .3rem .6rem; font-size: .7rem; color: var(--text-faint); border-top: 1px solid var(--divider); flex-shrink: 0; }
+    /* ── Deal card ── */
+    .deal-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); padding: .55rem .7rem; cursor: pointer; display: flex; flex-direction: column; gap: .3rem; }
+    .deal-card:hover { border-color: var(--primary); box-shadow: var(--shadow-sm); }
+    .deal-card.dragging { opacity: .35; cursor: grabbing; }
+    .deal-title { font-size: .82rem; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .deal-company { font-size: .7rem; color: var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .deal-row { display: flex; align-items: center; justify-content: space-between; font-size: .68rem; color: var(--text-muted); }
+    .deal-revenue { font-weight: 600; color: var(--text); font-size: .8rem; }
+    .deal-prob { font-size: .68rem; color: var(--text-faint); }
+    .kb-empty { padding: .65rem .4rem; text-align: center; font-size: .7rem; color: var(--text-faint); border: 1px dashed var(--border); border-radius: var(--r-md); }
+    /* ── List ── */
+    .list-wrap { flex: 1; overflow-y: auto; padding: 1.5rem; }
+    @media (max-width: 900px) { .kanban { padding: .75rem 1rem; } .list-wrap { padding: 1rem; } }
+  </style>
+</head>
+<body>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <h1 class="topbar-title">Сделки <span class="count" id="totalCount"></span></h1>
+      <button class="btn btn-primary" id="btnNew">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Новая сделка
+      </button>
+    </header>
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="searchInput" class="search-input" placeholder="Поиск по названию…">
+      </div>
+      <select id="fOutcome" class="filter-select">
+        <option value="in_progress">В работе</option>
+        <option value="">Все статусы</option>
+        <option value="won">Выиграна</option>
+        <option value="lost">Проиграна</option>
+        <option value="postponed">Отложена</option>
+      </select>
+      <select id="fService" class="filter-select">
+        <option value="">Все услуги</option>
+        <option value="transport">Перевозка</option>
+        <option value="customs">Таможня</option>
+        <option value="warehouse">Склад</option>
+        <option value="multimodal">Мультимодал</option>
+      </select>
+      <div class="toolbar-right">
+        <div class="view-toggle">
+          <button class="view-btn active" id="viewKanban" title="Канбан">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="6" height="18"/><rect x="11" y="3" width="6" height="11"/></svg>
+          </button>
+          <button class="view-btn" id="viewList" title="Таблица">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-bare">
+      <div class="kanban" id="kanbanView"></div>
+      <div class="list-wrap" id="listView" style="display:none">
+        <div class="table-wrap">
+          <table class="data-table" id="dealsTable">
+            <thead><tr>
+              <th data-col="title">Сделка ↕</th>
+              <th data-col="company">Компания</th>
+              <th data-col="stage">Стадия</th>
+              <th data-col="planned_revenue">Сумма ↕</th>
+              <th data-col="probability">Вероят.</th>
+              <th data-col="planned_close_at">Закрыть до ↕</th>
+              <th data-col="outcome">Статус</th>
+            </tr></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modal: сделка ── -->
+  <div class="modal-backdrop" id="dealModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 class="modal-title" id="modalTitle">Новая сделка</h3>
+        <button class="icon-btn" id="modalClose"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="dId">
+        <div class="form-grid form-grid-2">
+          <div class="field col-span-2"><label class="field-label">Название <span class="req">*</span></label><input id="dTitle" class="input" placeholder="Перевозка Москва — Новосиб"></div>
+          <div class="field"><label class="field-label">Компания <span class="req">*</span></label><select id="dCompany" class="select"></select></div>
+          <div class="field"><label class="field-label">Услуга</label>
+            <select id="dService" class="select"><option value="transport">Перевозка</option><option value="customs">Таможня</option><option value="warehouse">Склад</option><option value="multimodal">Мультимодал</option><option value="other">Другое</option></select>
+          </div>
+          <div class="field"><label class="field-label">Стадия</label><select id="dStage" class="select"></select></div>
+          <div class="field"><label class="field-label">Вероятность %</label><input id="dProb" type="number" class="input" min="0" max="100"></div>
+          <div class="field"><label class="field-label">Сумма</label><input id="dRevenue" type="number" class="input" placeholder="0"></div>
+          <div class="field"><label class="field-label">Маржа</label><input id="dMargin" type="number" class="input" placeholder="0"></div>
+          <div class="field"><label class="field-label">Валюта</label>
+            <select id="dCurrency" class="select"><option value="RUB">RUB ₽</option><option value="USD">USD $</option><option value="EUR">EUR €</option></select>
+          </div>
+          <div class="field"><label class="field-label">Закрыть до</label><input id="dClose" type="date" class="input"></div>
+          <div class="field col-span-2"><label class="field-label">Ответственный</label><select id="dOwner" class="select"></select></div>
+          <div class="field col-span-2"><label class="field-label">Описание</label><textarea id="dDesc" class="textarea" rows="2"></textarea></div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <div class="modal-foot-left">
+          <button class="btn btn-danger" id="btnDeleteDeal" hidden>Удалить</button>
+          <button class="btn btn-ghost" id="btnCloseDeal" hidden>Закрыть сделку…</button>
+          <button class="btn btn-ghost" id="btnReopenDeal" hidden>Возобновить</button>
+        </div>
+        <button class="btn btn-ghost" id="dCancel">Отмена</button>
+        <button class="btn btn-primary" id="dSave">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modal: закрыть сделку ── -->
+  <div class="modal-backdrop" id="closeModal">
+    <div class="modal modal-sm">
+      <div class="modal-head"><h3 class="modal-title">Закрыть сделку</h3></div>
+      <div class="modal-body">
+        <div class="field"><label class="field-label">Итог <span class="req">*</span></label>
+          <select id="closeOutcome" class="select">
+            <option value="won">Выиграна</option>
+            <option value="lost">Проиграна</option>
+            <option value="postponed">Отложена</option>
+          </select>
+        </div>
+        <div class="field" id="lossReasonField">
+          <label class="field-label">Причина проигрыша <span class="req">*</span></label>
+          <select id="lossReason" class="select">
+            <option value="price">Цена</option>
+            <option value="timing">Сроки</option>
+            <option value="service">Сервис</option>
+            <option value="no_need">Нет потребности</option>
+            <option value="carrier">Другой перевозчик</option>
+            <option value="no_lpr">Не вышли на ЛПР</option>
+            <option value="other_loss">Другое</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" id="closeCancelBtn">Отмена</button>
+        <button class="btn btn-primary" id="closeConfirmBtn">Подтвердить</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    import { initUI, esc, fmtDate, toast, todayStr } from '/js/ui.js';
+    import {
+      searchDeals, getDeal, createDeal, updateDeal, deleteDeal,
+      changeStage, closeDeal, reopenDeal, formatMoney,
+      STAGES, STAGE_LABELS, STAGE_COLORS, STAGE_PROBABILITY,
+      OUTCOME_LABELS, OUTCOME_COLORS, SERVICE_LABELS, LOSS_REASON_LABELS,
+    } from '/js/deals.js';
+    import { getCompanies } from '/js/companies.js';
+    import { dbGetAll } from '/js/db.js';
+    import { can, ROLES } from '/js/auth.js';
+
+    const session = await initUI({ active: 'deals' });
+    if (!session) throw new Error('no session');
+
+    let deals = [], companies = [], users = [];
+    let viewMode = 'kanban';
+    let sortCol = 'title', sortDir = 1;
+    let editingId = null;
+
+    // ── Load
+    async function load() {
+      const q  = document.getElementById('searchInput').value;
+      const oc = document.getElementById('fOutcome').value;
+      const sv = document.getElementById('fService').value;
+      deals = await searchDeals({ query: q, outcome: oc, service: sv });
+      document.getElementById('totalCount').textContent = deals.length ? `(${deals.length})` : '';
+      viewMode === 'kanban' ? renderKanban() : renderList();
+    }
+
+    [companies, users] = await Promise.all([getCompanies(), dbGetAll('users').catch(() => [])]);
+    const compById = Object.fromEntries(companies.map(c => [c.id, c]));
+    await load();
+
+    // ── Kanban
+    let dragId = null;
+
+    function renderKanban() {
+      const byStage = Object.fromEntries(STAGES.map(s => [s, []]));
+      deals.forEach(d => { if (byStage[d.stage]) byStage[d.stage].push(d); });
+
+      document.getElementById('kanbanView').innerHTML = STAGES.map(st => {
+        const items = byStage[st];
+        const col   = STAGE_COLORS[st] || 'gray';
+        const total = items.reduce((s, d) => s + Number(d.planned_revenue || 0), 0);
+        const cards = items.length
+          ? items.map(d => {
+              const co = compById[d.company_id];
+              return `<div class="deal-card" draggable="true" data-id="${d.id}">
+                <div class="deal-title">${esc(d.title)}</div>
+                ${co ? `<div class="deal-company">${esc(co.name)}</div>` : ''}
+                <div class="deal-row">
+                  <span class="deal-revenue">${d.planned_revenue ? formatMoney(d.planned_revenue, d.currency) : '—'}</span>
+                  <span class="deal-prob">${d.probability}%</span>
+                </div>
+              </div>`;
+            }).join('')
+          : `<div class="kb-empty">Нет сделок</div>`;
+
+        return `<div class="kb-col">
+          <div class="kb-head">
+            <div class="kb-stripe ${col}"></div>
+            <div class="kb-name">${STAGE_LABELS[st]}</div>
+            <div class="kb-count">${items.length}</div>
+          </div>
+          <div class="kb-body" data-drop-stage="${st}">${cards}</div>
+          ${total ? `<div class="kb-sum">${formatMoney(total, 'RUB')}</div>` : ''}
+        </div>`;
+      }).join('');
+
+      attachDrag();
+    }
+
+    function attachDrag() {
+      document.querySelectorAll('.deal-card').forEach(card => {
+        card.addEventListener('dragstart', e => { dragId = card.dataset.id; card.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+        card.addEventListener('dragend', () => { card.classList.remove('dragging'); dragId = null; document.querySelectorAll('.kb-body.drag-over').forEach(c => c.classList.remove('drag-over')); });
+        card.addEventListener('click', () => openModal(card.dataset.id));
+      });
+      document.querySelectorAll('.kb-body').forEach(col => {
+        col.addEventListener('dragover', e => { if (!dragId) return; e.preventDefault(); col.classList.add('drag-over'); });
+        col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+        col.addEventListener('drop', async e => {
+          e.preventDefault(); col.classList.remove('drag-over');
+          const newStage = col.dataset.dropStage;
+          if (!dragId || !newStage) return;
+          const deal = deals.find(d => d.id === dragId);
+          if (!deal || deal.stage === newStage) return;
+          try { await changeStage(dragId, newStage); await load(); toast('Стадия изменена'); }
+          catch (err) { toast(err.message, 'error'); }
+        });
+      });
+    }
+
+    // ── List
+    function renderList() {
+      if (!deals.length) {
+        document.getElementById('tableBody').innerHTML = `<tr><td colspan="7"><div class="empty-state">
+          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <h3>Сделок не найдено</h3><p>Попробуйте изменить фильтры.</p>
+          <button class="btn btn-primary" onclick="document.getElementById('btnNew').click()">Создать сделку</button>
+        </div></td></tr>`;
+        return;
+      }
+      const today = todayStr();
+      let sorted = [...deals];
+      sorted.sort((a, b) => {
+        let va = a[sortCol] ?? '', vb = b[sortCol] ?? '';
+        if (sortCol === 'company') { va = compById[a.company_id]?.name ?? ''; vb = compById[b.company_id]?.name ?? ''; }
+        if (typeof va === 'string') va = va.toLowerCase();
+        if (typeof vb === 'string') vb = vb.toLowerCase();
+        return va < vb ? -sortDir : va > vb ? sortDir : 0;
+      });
+
+      document.getElementById('tableBody').innerHTML = sorted.map(d => {
+        const co = compById[d.company_id];
+        const oc = OUTCOME_COLORS[d.outcome] || 'gray';
+        const ov = d.planned_close_at && d.planned_close_at < today && d.outcome === 'in_progress';
+        return `<tr data-id="${d.id}">
+          <td><div style="font-weight:500">${esc(d.title)}</div></td>
+          <td><a href="/company.html?id=${d.company_id}" class="card-link" onclick="event.stopPropagation()">${esc(co?.name || '—')}</a></td>
+          <td><span class="badge badge-${STAGE_COLORS[d.stage]||'gray'}"><span class="badge-dot"></span>${STAGE_LABELS[d.stage]||d.stage}</span></td>
+          <td style="font-weight:500">${d.planned_revenue ? formatMoney(d.planned_revenue, d.currency) : '—'}</td>
+          <td style="color:var(--text-muted)">${d.probability}%</td>
+          <td style="${ov?'color:var(--error);font-weight:500':''}">${d.planned_close_at ? fmtDate(d.planned_close_at) : '—'}</td>
+          <td><span class="badge badge-${oc}"><span class="badge-dot"></span>${OUTCOME_LABELS[d.outcome]||d.outcome}</span></td>
+        </tr>`;
+      }).join('');
+    }
+
+    document.getElementById('tableBody').addEventListener('click', e => {
+      const tr = e.target.closest('tr[data-id]');
+      if (tr && !e.target.closest('a')) openModal(tr.dataset.id);
+    });
+
+    document.querySelectorAll('#dealsTable th[data-col]').forEach(th => {
+      th.addEventListener('click', () => {
+        if (sortCol === th.dataset.col) sortDir *= -1; else { sortCol = th.dataset.col; sortDir = 1; }
+        renderList();
+      });
+    });
+
+    // ── Modal
+    function openModal(id = null) {
+      editingId = id;
+      document.getElementById('modalTitle').textContent = id ? 'Редактировать сделку' : 'Новая сделка';
+
+      // Populate dropdowns
+      const stageOpts = STAGES.map(s => `<option value="${s}">${STAGE_LABELS[s]}</option>`).join('');
+      document.getElementById('dStage').innerHTML = stageOpts;
+      document.getElementById('dCompany').innerHTML = companies.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+      document.getElementById('dOwner').innerHTML = users.map(u => `<option value="${u.id}">${esc([u.first_name,u.last_name].filter(Boolean).join(' ')||u.email)}</option>`).join('');
+
+      if (id) {
+        const d = deals.find(x => x.id === id);
+        if (!d) return;
+        document.getElementById('dId').value      = d.id;
+        document.getElementById('dTitle').value   = d.title;
+        document.getElementById('dCompany').value = d.company_id;
+        document.getElementById('dService').value = d.service;
+        document.getElementById('dStage').value   = d.stage;
+        document.getElementById('dProb').value    = d.probability;
+        document.getElementById('dRevenue').value = d.planned_revenue || '';
+        document.getElementById('dMargin').value  = d.planned_margin || '';
+        document.getElementById('dCurrency').value = d.currency;
+        document.getElementById('dClose').value   = d.planned_close_at || '';
+        document.getElementById('dOwner').value   = d.owner_id;
+        document.getElementById('dDesc').value    = d.description || '';
+        const isClosed = d.outcome !== 'in_progress';
+        document.getElementById('btnDeleteDeal').hidden  = !can([ROLES.ADMIN, ROLES.HEAD]);
+        document.getElementById('btnCloseDeal').hidden   = isClosed;
+        document.getElementById('btnReopenDeal').hidden  = !isClosed;
+      } else {
+        document.getElementById('dId').value = '';
+        document.getElementById('dTitle').value = '';
+        document.getElementById('dService').value = 'transport';
+        document.getElementById('dStage').value = 'new_lead';
+        document.getElementById('dProb').value = 5;
+        document.getElementById('dRevenue').value = '';
+        document.getElementById('dMargin').value = '';
+        document.getElementById('dCurrency').value = 'RUB';
+        document.getElementById('dClose').value = '';
+        document.getElementById('dDesc').value = '';
+        document.getElementById('dOwner').value = session.id;
+        // Pre-select company from URL
+        const preComp = new URLSearchParams(location.search).get('company_id');
+        if (preComp) document.getElementById('dCompany').value = preComp;
+        document.getElementById('btnDeleteDeal').hidden  = true;
+        document.getElementById('btnCloseDeal').hidden   = true;
+        document.getElementById('btnReopenDeal').hidden  = true;
+      }
+
+      document.getElementById('dStage').addEventListener('change', () => {
+        const s = document.getElementById('dStage').value;
+        document.getElementById('dProb').value = STAGE_PROBABILITY[s] || 5;
+      }, { once: false });
+
+      document.getElementById('dealModal').classList.add('open');
+      document.getElementById('dTitle').focus();
+    }
+
+    function closeModal() { document.getElementById('dealModal').classList.remove('open'); editingId = null; }
+    document.getElementById('modalClose').addEventListener('click', closeModal);
+    document.getElementById('dCancel').addEventListener('click', closeModal);
+    document.getElementById('dealModal').addEventListener('click', e => { if (e.target === document.getElementById('dealModal')) closeModal(); });
+
+    document.getElementById('dSave').addEventListener('click', async () => {
+      const title = document.getElementById('dTitle').value.trim();
+      if (!title) { toast('Введите название', 'error'); return; }
+      const company_id = document.getElementById('dCompany').value;
+      if (!company_id) { toast('Выберите компанию', 'error'); return; }
+
+      const data = {
+        title, company_id,
+        service:          document.getElementById('dService').value,
+        stage:            document.getElementById('dStage').value,
+        probability:      Number(document.getElementById('dProb').value),
+        planned_revenue:  Number(document.getElementById('dRevenue').value || 0),
+        planned_margin:   Number(document.getElementById('dMargin').value || 0),
+        currency:         document.getElementById('dCurrency').value,
+        planned_close_at: document.getElementById('dClose').value || null,
+        owner_id:         document.getElementById('dOwner').value,
+        description:      document.getElementById('dDesc').value,
+      };
+
+      document.getElementById('dSave').disabled = true;
+      try {
+        if (editingId) {
+          await updateDeal(editingId, { ...data, id: editingId });
+          toast('Сделка обновлена', 'success');
+        } else {
+          await createDeal(data);
+          toast('Сделка создана', 'success');
+        }
+        closeModal();
+        await load();
+      } catch (err) { toast(err.message, 'error'); }
+      finally { document.getElementById('dSave').disabled = false; }
+    });
+
+    document.getElementById('btnDeleteDeal').addEventListener('click', async () => {
+      if (!editingId || !confirm('Удалить сделку?')) return;
+      try { await deleteDeal(editingId); closeModal(); await load(); toast('Удалено'); }
+      catch (err) { toast(err.message, 'error'); }
+    });
+
+    document.getElementById('btnReopenDeal').addEventListener('click', async () => {
+      if (!editingId) return;
+      try { await reopenDeal(editingId); closeModal(); await load(); toast('Сделка возобновлена', 'success'); }
+      catch (err) { toast(err.message, 'error'); }
+    });
+
+    // ── Close deal
+    document.getElementById('btnCloseDeal').addEventListener('click', () => {
+      document.getElementById('closeModal').classList.add('open');
+      document.getElementById('closeOutcome').value = 'won';
+      document.getElementById('lossReasonField').style.display = 'none';
+    });
+    document.getElementById('closeOutcome').addEventListener('change', () => {
+      document.getElementById('lossReasonField').style.display =
+        document.getElementById('closeOutcome').value === 'lost' ? 'flex' : 'none';
+    });
+    document.getElementById('closeCancelBtn').addEventListener('click', () => document.getElementById('closeModal').classList.remove('open'));
+    document.getElementById('closeConfirmBtn').addEventListener('click', async () => {
+      if (!editingId) return;
+      const outcome = document.getElementById('closeOutcome').value;
+      const loss    = document.getElementById('lossReason').value;
+      if (outcome === 'lost' && !loss) { toast('Укажите причину', 'error'); return; }
+      try {
+        await closeDeal(editingId, outcome, loss);
+        document.getElementById('closeModal').classList.remove('open');
+        closeModal(); await load();
+        toast(`Сделка ${outcome === 'won' ? 'выиграна' : outcome === 'lost' ? 'проиграна' : 'отложена'}`, 'success');
+      } catch (err) { toast(err.message, 'error'); }
+    });
+    document.getElementById('closeModal').addEventListener('click', e => { if (e.target === document.getElementById('closeModal')) document.getElementById('closeModal').classList.remove('open'); });
+
+    // ── Toolbar
+    document.getElementById('btnNew').addEventListener('click', () => openModal(null));
+    let searchTimer;
+    document.getElementById('searchInput').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(load, 220); });
+    document.getElementById('fOutcome').addEventListener('change', load);
+    document.getElementById('fService').addEventListener('change', load);
+
+    document.getElementById('viewKanban').addEventListener('click', () => {
+      viewMode = 'kanban';
+      document.getElementById('viewKanban').classList.add('active');
+      document.getElementById('viewList').classList.remove('active');
+      document.getElementById('kanbanView').style.display = 'flex';
+      document.getElementById('listView').style.display = 'none';
+      renderKanban();
+    });
+    document.getElementById('viewList').addEventListener('click', () => {
+      viewMode = 'list';
+      document.getElementById('viewList').classList.add('active');
+      document.getElementById('viewKanban').classList.remove('active');
+      document.getElementById('kanbanView').style.display = 'none';
+      document.getElementById('listView').style.display = 'flex';
+      renderList();
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.target.matches('input,textarea,select')) return;
+      if (e.key === 'n' || e.key === 'т') openModal(null);
+      if (e.key === 'Escape') { closeModal(); document.getElementById('closeModal').classList.remove('open'); }
+    });
+
+    // Open new deal if URL param
+    if (new URLSearchParams(location.search).has('new')) openModal(null);
+  </script>
+</body>
+</html>

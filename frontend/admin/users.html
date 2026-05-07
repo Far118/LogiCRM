@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <style>html{visibility:hidden}</style>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Пользователи — LogiCRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    .user-row {
+      display: flex; align-items: center; gap: 1rem;
+      padding: .85rem 1.5rem; border-bottom: 1px solid var(--divider);
+    }
+    .user-row:hover { background: var(--surface-off); }
+    .user-ava { width: 38px; height: 38px; border-radius: var(--r-full); background: var(--primary-subtle); color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: .85rem; font-weight: 600; flex-shrink: 0; }
+    .user-ava.inactive { background: var(--surface-off); color: var(--text-faint); }
+    .user-info { flex: 1; min-width: 0; }
+    .user-name-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+    .user-fullname { font-weight: 600; font-size: .9em; }
+    .user-email { font-size: .78rem; color: var(--text-muted); margin-top: 1px; }
+    .user-last { font-size: .72rem; color: var(--text-faint); white-space: nowrap; }
+    .badge-inactive { background: var(--surface-off); color: var(--text-faint); }
+    /* Temp password block */
+    .temp-pass {
+      background: color-mix(in oklch, var(--success) 8%, var(--surface));
+      border: 1px solid color-mix(in oklch, var(--success) 30%, var(--border));
+      border-radius: var(--r-lg); padding: 1rem 1.25rem;
+    }
+    .temp-pass h4 { font-size: .9em; font-weight: 600; color: var(--success); margin-bottom: .5rem; }
+    .temp-pass-value { font-family: monospace; font-size: 1.2rem; letter-spacing: .1em; font-weight: 700; color: var(--text); }
+    @media (max-width: 900px) { .user-row { padding: .75rem 1rem; } }
+  </style>
+</head>
+<body>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <h1 class="topbar-title">Пользователи <span class="count" id="totalCount"></span></h1>
+      <button class="btn btn-primary" id="btnNew">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Создать
+      </button>
+    </header>
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="searchInput" class="search-input" placeholder="Поиск по имени, email…">
+      </div>
+      <select id="fRole" class="filter-select">
+        <option value="">Все роли</option>
+        <option value="admin">Администратор</option>
+        <option value="head">Руководитель</option>
+        <option value="manager">Менеджер</option>
+        <option value="ops">Операционный</option>
+      </select>
+      <select id="fStatus" class="filter-select">
+        <option value="">Все статусы</option>
+        <option value="active">Активные</option>
+        <option value="inactive">Заблокированные</option>
+      </select>
+    </div>
+
+    <div class="content-bare" style="overflow-y:auto" id="userList">
+      <div style="padding:2rem;text-align:center"><div class="skeleton" style="width:60%;margin:0 auto"></div></div>
+    </div>
+  </div>
+
+  <!-- ── Modal: создать пользователя ── -->
+  <div class="modal-backdrop" id="userModal">
+    <div class="modal modal-sm">
+      <div class="modal-head">
+        <h3 class="modal-title" id="modalTitle">Новый пользователь</h3>
+        <button class="icon-btn" id="mClose"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <div class="form-grid form-grid-2">
+          <div class="field"><label class="field-label">Имя <span class="req">*</span></label><input id="uFirst" class="input"></div>
+          <div class="field"><label class="field-label">Фамилия</label><input id="uLast" class="input"></div>
+        </div>
+        <div class="field"><label class="field-label">Email <span class="req">*</span></label><input id="uEmail" type="email" class="input"></div>
+        <div class="field"><label class="field-label">Роль <span class="req">*</span></label>
+          <select id="uRole" class="select">
+            <option value="manager">Менеджер по продажам</option>
+            <option value="head">Руководитель отдела</option>
+            <option value="ops">Операционный менеджер</option>
+            <option value="admin">Администратор</option>
+          </select>
+        </div>
+        <p style="font-size:.82rem;color:var(--text-muted);background:var(--surface-off);padding:.65rem .85rem;border-radius:var(--r-md)">
+          После создания пользователю будет показан временный пароль. При первом входе система попросит его сменить.
+        </p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" id="mCancel">Отмена</button>
+        <button class="btn btn-primary" id="mSave">Создать</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    import { initUI, esc, fmtDate, fmtDateTime, toast } from '/js/ui.js';
+    import { dbGetAll } from '/js/db.js';
+    import { ROLES } from '/js/auth.js';
+
+    const session = await initUI({ active: 'admin', roles: ['admin'] });
+    if (!session) throw new Error('no access');
+
+    const ROLE_LABELS = { admin:'Администратор', head:'Руководитель', manager:'Менеджер', ops:'Операционный' };
+    const ROLE_COLORS = { admin:'red', head:'blue', manager:'teal', ops:'orange' };
+
+    let users = [];
+
+    async function load() {
+      users = await dbGetAll('users');
+      render();
+    }
+
+    await load();
+
+    function render() {
+      const q       = document.getElementById('searchInput').value.toLowerCase();
+      const fRole   = document.getElementById('fRole').value;
+      const fStatus = document.getElementById('fStatus').value;
+
+      let list = [...users];
+      if (q)                 list = list.filter(u => (u.first_name + u.last_name + u.email).toLowerCase().includes(q));
+      if (fRole)             list = list.filter(u => u.role === fRole);
+      if (fStatus === 'active')   list = list.filter(u => u.is_active);
+      if (fStatus === 'inactive') list = list.filter(u => !u.is_active);
+
+      document.getElementById('totalCount').textContent = list.length ? `(${list.length})` : '';
+
+      if (!list.length) {
+        document.getElementById('userList').innerHTML = `<div class="empty-state">
+          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <h3>Пользователей не найдено</h3>
+          <p>Попробуйте изменить фильтры.</p>
+        </div>`;
+        return;
+      }
+
+      document.getElementById('userList').innerHTML = list.map(u => {
+        const ini = ((u.first_name?.[0]||'') + (u.last_name?.[0]||'')).toUpperCase() || u.email?.[0]?.toUpperCase() || '?';
+        const fullName = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email;
+        const isMe = u.id === session.id;
+        const rc = ROLE_COLORS[u.role] || 'gray';
+        const rl = ROLE_LABELS[u.role] || u.role;
+        const fpChip = u.force_password_change ? `<span class="badge badge-orange"><span class="badge-dot"></span>Смена пароля</span>` : '';
+
+        return `<div class="user-row">
+          <div class="user-ava${u.is_active?'':' inactive'}">${ini}</div>
+          <div class="user-info">
+            <div class="user-name-row">
+              <span class="user-fullname">${esc(fullName)}</span>
+              <span class="badge badge-${rc}"><span class="badge-dot"></span>${rl}</span>
+              ${!u.is_active ? '<span class="badge badge-gray">Заблокирован</span>' : ''}
+              ${fpChip}
+              ${isMe ? '<span class="badge badge-teal">Это вы</span>' : ''}
+            </div>
+            <div class="user-email">${esc(u.email)}</div>
+          </div>
+          <div class="user-last">${u.last_login ? 'Вход: ' + fmtDate(u.last_login) : 'Не входил'}</div>
+          ${!isMe ? `<button class="btn btn-ghost btn-sm" data-toggle="${u.id}" data-active="${u.is_active}">
+            ${u.is_active ? 'Заблокировать' : 'Разблокировать'}
+          </button>` : ''}
+        </div>`;
+      }).join('');
+    }
+
+    document.getElementById('userList').addEventListener('click', async e => {
+      const toggleBtn = e.target.closest('[data-toggle]');
+      if (!toggleBtn) return;
+
+      const uid       = toggleBtn.dataset.toggle;
+      const isActive  = toggleBtn.dataset.active === 'true';
+      const action    = isActive ? 'заблокировать' : 'разблокировать';
+      const user      = users.find(u => u.id === uid);
+      if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} пользователя «${user?.first_name || user?.email}»?`)) return;
+
+      try {
+        const res = await fetch(`/api/users/${uid}/active`, {
+          method: 'PATCH', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_active: !isActive }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        const idx = users.findIndex(u => u.id === uid);
+        if (idx !== -1) users[idx] = { ...users[idx], is_active: !isActive };
+        render();
+        toast(isActive ? 'Пользователь заблокирован' : 'Пользователь разблокирован', 'success');
+      } catch (err) { toast(err.message, 'error'); }
+    });
+
+    // ── Фильтры
+    let timer;
+    ['searchInput','fRole','fStatus'].forEach(id => {
+      document.getElementById(id).addEventListener('input',  () => { clearTimeout(timer); timer = setTimeout(render, 180); });
+      document.getElementById(id).addEventListener('change', render);
+    });
+
+    // ── Modal
+    const modal = document.getElementById('userModal');
+    function openModal() {
+      document.getElementById('uFirst').value = '';
+      document.getElementById('uLast').value  = '';
+      document.getElementById('uEmail').value = '';
+      document.getElementById('uRole').value  = 'manager';
+      modal.classList.add('open');
+      document.getElementById('uFirst').focus();
+    }
+    function closeModal() { modal.classList.remove('open'); }
+
+    document.getElementById('btnNew').addEventListener('click', openModal);
+    document.getElementById('mClose').addEventListener('click', closeModal);
+    document.getElementById('mCancel').addEventListener('click', closeModal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+    document.getElementById('mSave').addEventListener('click', async () => {
+      const first = document.getElementById('uFirst').value.trim();
+      const last  = document.getElementById('uLast').value.trim();
+      const email = document.getElementById('uEmail').value.trim();
+      const role  = document.getElementById('uRole').value;
+
+      if (!first) { toast('Введите имя', 'error'); return; }
+      if (!email) { toast('Введите email', 'error'); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('Некорректный email', 'error'); return; }
+
+      document.getElementById('mSave').disabled = true;
+      try {
+        const res = await fetch('/api/users', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ first_name: first, last_name: last, email, role }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        // Показываем временный пароль
+        document.getElementById('modalBody').innerHTML = `
+          <div class="temp-pass">
+            <h4>✓ Пользователь создан</h4>
+            <p style="font-size:.85em;margin-bottom:.75rem">Сообщите сотруднику этот временный пароль. Он увидит его только сейчас — после закрытия окна восстановить нельзя.</p>
+            <div class="field-label">Временный пароль</div>
+            <div class="temp-pass-value" id="tpValue">${esc(data.tempPassword)}</div>
+          </div>
+          <div style="font-size:.82rem;color:var(--text-muted);margin-top:.75rem">
+            При первом входе система попросит сменить пароль.
+          </div>
+        `;
+        document.getElementById('mSave').hidden = true;
+        document.getElementById('mCancel').textContent = 'Закрыть';
+        document.getElementById('mCancel').addEventListener('click', () => { load(); }, { once: true });
+
+        await load();
+      } catch (err) {
+        toast(err.message, 'error');
+      } finally {
+        document.getElementById('mSave').disabled = false;
+      }
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeModal();
+    });
+  </script>
+</body>
+</html>

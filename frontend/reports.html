@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <title>Отчёты — LogiCRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    html { visibility: hidden; }
+    .report-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: .75rem;
+      margin-bottom: 1.25rem;
+    }
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 1rem 1.25rem;
+      box-shadow: var(--shadow-sm);
+    }
+    .kpi-val  { font-size: 1.75rem; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+    .kpi-lbl  { font-size: .75rem; color: var(--text-muted); margin-top: .3rem; }
+    .kpi-sub  { font-size: .72rem; color: var(--text-faint); margin-top: .2rem; }
+    .kpi-card.good  .kpi-val { color: var(--success); }
+    .kpi-card.warn  .kpi-val { color: var(--warning); }
+    .kpi-card.info  .kpi-val { color: var(--primary); }
+    .kpi-card.accent.kpi-val { color: var(--text); }
+
+    /* Period selector */
+    .period-bar {
+      display: flex; align-items: center; gap: .5rem;
+      padding: .75rem 1.5rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--divider);
+      flex-shrink: 0; flex-wrap: wrap;
+    }
+    .period-btn {
+      padding: .35rem .75rem;
+      border-radius: var(--r-md);
+      font-size: .82rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      border: 1px solid transparent;
+    }
+    .period-btn:hover { background: var(--surface-off); color: var(--text); }
+    .period-btn.active {
+      background: var(--primary-subtle);
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+    .period-sep { color: var(--text-faint); font-size: .8rem; }
+    .date-range { display: flex; align-items: center; gap: .35rem; }
+    .date-range input { padding: .3rem .6rem; font-size: .8rem; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg); color: var(--text); outline: none; }
+    .date-range input:focus { border-color: var(--primary); }
+
+    /* Charts */
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+    .chart-head {
+      padding: .75rem 1.25rem;
+      border-bottom: 1px solid var(--divider);
+      display: flex; align-items: center; gap: .75rem;
+    }
+    .chart-title { font-size: .9rem; font-weight: 600; flex: 1; }
+    .chart-body  { padding: 1.25rem; }
+
+    /* Funnel bars */
+    .funnel-row {
+      display: flex; align-items: center; gap: .75rem;
+      margin-bottom: .5rem;
+    }
+    .funnel-label { width: 160px; font-size: .78rem; color: var(--text-muted); text-align: right; flex-shrink: 0; }
+    .funnel-bar-wrap { flex: 1; height: 24px; background: var(--surface-off); border-radius: var(--r-md); overflow: hidden; }
+    .funnel-bar {
+      height: 100%; border-radius: var(--r-md);
+      background: var(--primary);
+      transition: width .6s cubic-bezier(.16,1,.3,1);
+      display: flex; align-items: center; padding-left: .5rem;
+    }
+    .funnel-bar span { font-size: .7rem; font-weight: 600; color: #fff; white-space: nowrap; }
+    .funnel-count { width: 80px; font-size: .78rem; color: var(--text-muted); text-align: right; flex-shrink: 0; }
+
+    /* Activity bars */
+    .act-type-row {
+      display: flex; align-items: center; gap: .75rem;
+      margin-bottom: .5rem;
+    }
+    .act-type-label { width: 140px; font-size: .78rem; color: var(--text-muted); flex-shrink: 0; }
+    .act-bar-wrap { flex: 1; height: 18px; background: var(--surface-off); border-radius: var(--r-full); overflow: hidden; }
+    .act-bar { height: 100%; border-radius: var(--r-full); transition: width .6s cubic-bezier(.16,1,.3,1); }
+    .act-count { width: 40px; font-size: .78rem; font-weight: 600; color: var(--text); text-align: right; flex-shrink: 0; }
+
+    /* Timeline SVG */
+    .timeline-wrap { overflow-x: auto; }
+
+    /* Team table */
+    .team-row {
+      display: flex; align-items: center; gap: 0;
+      padding: .6rem 1.25rem;
+      border-top: 1px solid var(--divider);
+    }
+    .team-row:hover { background: var(--surface-off); }
+    .team-ava {
+      width: 30px; height: 30px; border-radius: var(--r-full);
+      background: var(--primary-subtle); color: var(--primary);
+      font-size: .78rem; font-weight: 600;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-right: .75rem;
+    }
+    .team-name { flex: 1; min-width: 0; font-size: .88rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .team-col  { width: 80px; text-align: right; font-size: .82rem; color: var(--text-muted); flex-shrink: 0; }
+    .team-col.num { color: var(--text); font-weight: 500; }
+    .team-head { display: flex; align-items: center; gap: 0; padding: .4rem 1.25rem; }
+    .team-head .team-col { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; color: var(--text-faint); }
+
+    /* Loss reasons */
+    .loss-row {
+      display: flex; align-items: center; gap: .75rem;
+      margin-bottom: .5rem;
+    }
+    .loss-label { width: 160px; font-size: .78rem; color: var(--text-muted); flex-shrink: 0; }
+    .loss-bar-wrap { flex: 1; height: 18px; background: var(--surface-off); border-radius: var(--r-full); overflow: hidden; }
+    .loss-bar { height: 100%; border-radius: var(--r-full); background: var(--error); opacity: .7; transition: width .6s; }
+    .loss-count { width: 30px; font-size: .78rem; font-weight: 600; color: var(--text); text-align: right; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 1000px) { .two-col { grid-template-columns: 1fr; } }
+    @media (max-width: 900px)  { .funnel-label { width: 100px; } .team-col { width: 60px; } }
+
+    .empty-chart { padding: 2rem; text-align: center; color: var(--text-muted); font-size: .88em; }
+    .loading-pulse { animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  </style>
+</head>
+<body>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <h1 class="topbar-title">Отчёты и KPI</h1>
+      <div id="ownerFilter"></div>
+    </header>
+
+    <!-- Period selector -->
+    <div class="period-bar">
+      <button class="period-btn" data-p="week">Неделя</button>
+      <button class="period-btn active" data-p="month">Месяц</button>
+      <button class="period-btn" data-p="quarter">Квартал</button>
+      <button class="period-btn" data-p="year">Год</button>
+      <span class="period-sep">|</span>
+      <div class="date-range">
+        <input type="date" id="dateFrom">
+        <span style="color:var(--text-faint)">—</span>
+        <input type="date" id="dateTo">
+        <button class="btn btn-ghost btn-sm" id="applyDates">Применить</button>
+      </div>
+    </div>
+
+    <div class="content" id="reportContent">
+      <div class="report-grid">
+        <div class="kpi-card"><div class="kpi-val loading-pulse">…</div><div class="kpi-lbl">Загрузка…</div></div>
+        <div class="kpi-card"><div class="kpi-val loading-pulse">…</div><div class="kpi-lbl">Загрузка…</div></div>
+        <div class="kpi-card"><div class="kpi-val loading-pulse">…</div><div class="kpi-lbl">Загрузка…</div></div>
+        <div class="kpi-card"><div class="kpi-val loading-pulse">…</div><div class="kpi-lbl">Загрузка…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    import { initUI, esc, fmtDate, toast } from '/js/ui.js';
+    import { can, ROLES } from '/js/auth.js';
+
+    const session = await initUI({ active: 'reports' });
+    if (!session) throw new Error('no session');
+
+    const isHead = can([ROLES.ADMIN, ROLES.HEAD]);
+
+    // ── Owner filter (только для head/admin) ──────────────────────────────────
+    let selectedOwner = '';
+    if (isHead) {
+      const users = await fetch('/api/users', {credentials:'include'}).then(r=>r.json()).catch(()=>[]);
+      const sel = document.createElement('select');
+      sel.className = 'filter-select';
+      sel.style.fontSize = '.82rem';
+      sel.innerHTML = '<option value="">Вся команда</option>' +
+        users.map(u => `<option value="${u.id}">${esc([u.first_name,u.last_name].filter(Boolean).join(' ')||u.email)}</option>`).join('');
+      sel.addEventListener('change', () => { selectedOwner = sel.value; load(); });
+      document.getElementById('ownerFilter').appendChild(sel);
+    }
+
+    // ── Period logic ───────────────────────────────────────────────────────────
+    let fromDate = '', toDate = '';
+
+    function setPeriod(p) {
+      const now = new Date();
+      const pad = n => String(n).padStart(2,'0');
+      const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+      toDate = fmt(now);
+
+      if (p === 'week') {
+        const d = new Date(now); d.setDate(d.getDate() - 6);
+        fromDate = fmt(d);
+      } else if (p === 'month') {
+        fromDate = fmt(new Date(now.getFullYear(), now.getMonth(), 1));
+      } else if (p === 'quarter') {
+        const qStart = Math.floor(now.getMonth() / 3) * 3;
+        fromDate = fmt(new Date(now.getFullYear(), qStart, 1));
+      } else if (p === 'year') {
+        fromDate = fmt(new Date(now.getFullYear(), 0, 1));
+      }
+
+      document.getElementById('dateFrom').value = fromDate;
+      document.getElementById('dateTo').value   = toDate;
+    }
+
+    document.querySelectorAll('.period-btn[data-p]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        setPeriod(btn.dataset.p);
+        load();
+      });
+    });
+
+    document.getElementById('applyDates').addEventListener('click', () => {
+      fromDate = document.getElementById('dateFrom').value;
+      toDate   = document.getElementById('dateTo').value;
+      if (!fromDate || !toDate) return;
+      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      load();
+    });
+
+    setPeriod('month');
+
+    // ── API ────────────────────────────────────────────────────────────────────
+    async function api(path) {
+      const q = `from=${fromDate}&to=${toDate}${selectedOwner ? '&owner_id='+selectedOwner : ''}`;
+      const res = await fetch(`/api/reports/${path}?${q}`, { credentials: 'include' });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    }
+
+    // ── Formatters ─────────────────────────────────────────────────────────────
+    const fmtRub = n => {
+      n = Number(n||0);
+      if (n >= 1_000_000) return (n/1_000_000).toFixed(1) + ' млн ₽';
+      if (n >= 1_000)     return (n/1_000).toFixed(0) + ' тыс ₽';
+      return n.toLocaleString('ru-RU') + ' ₽';
+    };
+
+    // ── Render ─────────────────────────────────────────────────────────────────
+    const ACT_COLORS = {
+      call_out:'var(--primary)', call_in:'var(--primary)',
+      email_out:'var(--blue)', email_in:'var(--blue)',
+      meeting:'var(--orange)', proposal:'var(--success)', note:'var(--text-faint)',
+    };
+    const ACT_LABELS = {
+      call_out:'Исходящий звонок', call_in:'Входящий звонок',
+      email_out:'Исходящее письмо', email_in:'Входящее письмо',
+      meeting:'Встреча', proposal:'Отправка КП', task:'Задача', note:'Заметка',
+    };
+
+    async function load() {
+      try {
+        const [summary, funnel, actTypes, lossReasons, timeline] = await Promise.all([
+          api('summary'),
+          api('funnel'),
+          api('activity'),
+          api('loss-reasons'),
+          api('timeline'),
+        ]);
+        const teamData = isHead ? await api('team') : [];
+
+        render(summary, funnel, actTypes, lossReasons, timeline, teamData);
+      } catch(err) {
+        console.error(err);
+        toast('Ошибка загрузки отчёта: ' + err.message, 'error');
+      }
+    }
+
+    function render(s, funnel, actTypes, lossReasons, timeline, teamData) {
+      const d = s.deals;
+      const a = s.activities;
+
+      // ── KPI cards ────────────────────────────────────────────────────────────
+      const convClass = d.conversion >= 40 ? 'good' : d.conversion >= 20 ? '' : 'warn';
+      const kpiCards = `
+        <div class="kpi-card info">
+          <div class="kpi-val">${fmtRub(d.revenue)}</div>
+          <div class="kpi-lbl">Выручка (выигранные сделки)</div>
+          <div class="kpi-sub">Средняя маржа ${d.avg_margin}%</div>
+        </div>
+        <div class="kpi-card ${convClass}">
+          <div class="kpi-val">${d.conversion}%</div>
+          <div class="kpi-lbl">Конверсия выигранных</div>
+          <div class="kpi-sub">${d.won} выиграно · ${d.lost} проиграно</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val">${d.active}</div>
+          <div class="kpi-lbl">Активных сделок</div>
+          <div class="kpi-sub">${d.avg_days ? 'Ср. цикл ' + d.avg_days + ' дн.' : '—'}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val">${a.total}</div>
+          <div class="kpi-lbl">Активностей</div>
+          <div class="kpi-sub">${a.calls} звонков · ${a.meetings} встреч</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val">${s.companies}</div>
+          <div class="kpi-lbl">Новых компаний</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-val">${a.proposals}</div>
+          <div class="kpi-lbl">Отправлено КП</div>
+          <div class="kpi-sub">${a.emails} писем</div>
+        </div>
+        ${s.requests.total ? `<div class="kpi-card info">
+          <div class="kpi-val">${fmtRub(s.requests.revenue)}</div>
+          <div class="kpi-lbl">Выручка по запросам</div>
+          <div class="kpi-sub">${s.requests.won} из ${s.requests.total} · маржа ${s.requests.avg_margin}%</div>
+        </div>` : ''}
+      `;
+
+      // ── Funnel ────────────────────────────────────────────────────────────────
+      const maxFunnel = Math.max(...funnel.map(f => f.count), 1);
+      const funnelRows = funnel.map(f => {
+        const pct = Math.round(f.count / maxFunnel * 100);
+        const pipeStr = f.pipeline > 0 ? ' · ' + fmtRub(f.pipeline) : '';
+        return `<div class="funnel-row">
+          <div class="funnel-label">${esc(f.label)}</div>
+          <div class="funnel-bar-wrap">
+            <div class="funnel-bar" style="width:${pct}%">
+              ${pct > 20 ? `<span>${f.count}${pipeStr}</span>` : ''}
+            </div>
+          </div>
+          <div class="funnel-count">${pct <= 20 ? f.count : ''}</div>
+        </div>`;
+      }).join('');
+
+      // ── Activity types ────────────────────────────────────────────────────────
+      const maxAct = Math.max(...actTypes.map(a => a.count), 1);
+      const actRows = actTypes.map(a => `
+        <div class="act-type-row">
+          <div class="act-type-label">${ACT_LABELS[a.type]||a.type}</div>
+          <div class="act-bar-wrap">
+            <div class="act-bar" style="width:${Math.round(a.count/maxAct*100)}%;background:${ACT_COLORS[a.type]||'var(--text-faint)'}"></div>
+          </div>
+          <div class="act-count">${a.count}</div>
+        </div>`).join('');
+
+      // ── Timeline SVG ──────────────────────────────────────────────────────────
+      let timelineSvg = '<div class="empty-chart">Нет данных за период</div>';
+      if (timeline.length) {
+        const W = Math.max(timeline.length * 28, 400);
+        const H = 80;
+        const maxT = Math.max(...timeline.map(t => t.total), 1);
+        const barW = Math.min(Math.floor(W / timeline.length) - 4, 22);
+        const bars = timeline.map((t, i) => {
+          const bh = Math.round(t.total / maxT * (H - 24));
+          const x  = Math.floor(i * (W / timeline.length)) + Math.floor((W / timeline.length - barW) / 2);
+          const y  = H - bh - 16;
+          const dateStr = new Date(t.period).toLocaleDateString('ru-RU', {day:'2-digit',month:'2-digit'});
+          return `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="3"
+            fill="var(--primary)" opacity="${t.total>0?'.7':'.2'}"/>
+            ${i % Math.ceil(timeline.length / 8) === 0
+              ? `<text x="${x+barW/2}" y="${H}" text-anchor="middle" font-size="9"
+                  fill="var(--text-faint)">${dateStr}</text>` : ''}
+            ${t.total > 0 ? `<text x="${x+barW/2}" y="${y-3}" text-anchor="middle" font-size="9" fill="var(--text-muted)">${t.total}</text>` : ''}`;
+        }).join('');
+        timelineSvg = `<div class="timeline-wrap">
+          <svg width="${W}" height="${H+4}" viewBox="0 0 ${W} ${H+4}">${bars}</svg>
+        </div>`;
+      }
+
+      // ── Loss reasons ──────────────────────────────────────────────────────────
+      const maxLoss = Math.max(...lossReasons.map(l => l.count), 1);
+      const lossRows = lossReasons.length
+        ? lossReasons.map(l => `<div class="loss-row">
+            <div class="loss-label">${esc(l.label)}</div>
+            <div class="loss-bar-wrap"><div class="loss-bar" style="width:${Math.round(l.count/maxLoss*100)}%"></div></div>
+            <div class="loss-count">${l.count}</div>
+          </div>`).join('')
+        : '<div class="empty-chart">Нет проигранных сделок — отлично!</div>';
+
+      // ── Team table ────────────────────────────────────────────────────────────
+      const teamHtml = !isHead ? '' : `
+        <div class="chart-card">
+          <div class="chart-head"><div class="chart-title">Команда</div></div>
+          ${teamData.length ? `
+          <div class="team-head">
+            <div style="width:30px;margin-right:.75rem"></div>
+            <div class="team-name" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-faint);font-weight:600">Менеджер</div>
+            <div class="team-col" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-faint);font-weight:600">Компании</div>
+            <div class="team-col" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-faint);font-weight:600">Сделки</div>
+            <div class="team-col" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-faint);font-weight:600">Выручка</div>
+            <div class="team-col" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-faint);font-weight:600">Конв.</div>
+            <div class="team-col" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-faint);font-weight:600">Активн.</div>
+          </div>
+          ${teamData.map(m => {
+            const ini = (m.name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+            return `<div class="team-row">
+              <div class="team-ava">${ini}</div>
+              <div class="team-name">${esc(m.name)}</div>
+              <div class="team-col num">${m.companies}</div>
+              <div class="team-col num">${m.deals_won}<span style="color:var(--text-faint);font-weight:400"> / ${m.deals_total}</span></div>
+              <div class="team-col num" style="font-size:.75rem">${fmtRub(m.revenue)}</div>
+              <div class="team-col num" style="color:${m.conversion>=40?'var(--success)':m.conversion>=20?'var(--text)':'var(--error)'}">${m.conversion}%</div>
+              <div class="team-col num">${m.activities}</div>
+            </div>`;
+          }).join('')}` : '<div class="empty-chart">Нет данных</div>'}
+        </div>`;
+
+      // ── Собираем страницу ─────────────────────────────────────────────────────
+      document.getElementById('reportContent').innerHTML = `
+        <div class="report-grid">${kpiCards}</div>
+
+        <div class="chart-card">
+          <div class="chart-head"><div class="chart-title">Активность по дням</div></div>
+          <div class="chart-body">${timelineSvg}</div>
+        </div>
+
+        <div class="two-col">
+          <div class="chart-card">
+            <div class="chart-head"><div class="chart-title">Воронка продаж (активные сделки)</div></div>
+            <div class="chart-body">
+              ${funnel.some(f=>f.count>0) ? funnelRows : '<div class="empty-chart">Нет активных сделок</div>'}
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-head"><div class="chart-title">Виды активности</div></div>
+            <div class="chart-body">
+              ${actTypes.length ? actRows : '<div class="empty-chart">Нет активностей за период</div>'}
+            </div>
+          </div>
+        </div>
+
+        ${teamHtml}
+
+        <div class="chart-card">
+          <div class="chart-head"><div class="chart-title">Причины проигрышей</div></div>
+          <div class="chart-body">${lossRows}</div>
+        </div>
+      `;
+    }
+
+    await load();
+  </script>
+</body>
+</html>

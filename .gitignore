@@ -1,0 +1,23 @@
+﻿# Зависимости
+node_modules/
+frontend/node_modules/
+
+# Сборка Vite
+frontend/dist/
+
+# Переменные окружения — никогда не коммитим
+.env
+.env.*
+!.env.example
+!scripts/.env.backup.example
+
+# Бэкапы и логи
+*.sql.gz
+backups/
+*.log
+
+# OS и IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

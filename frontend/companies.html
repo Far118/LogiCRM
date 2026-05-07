@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <title>Компании — LogiCRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    html { visibility: hidden; }
+
+    /* ── Kanban ── */
+    .kanban { display:flex; gap:.75rem; padding:1rem 1.5rem; overflow-x:auto; overflow-y:hidden; flex:1; min-height:0; }
+    .kb-col { width:260px; flex-shrink:0; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); display:flex; flex-direction:column; max-height:100%; overflow:hidden; }
+    .kb-head { padding:.65rem .9rem; border-bottom:1px solid var(--divider); display:flex; align-items:center; gap:.5rem; flex-shrink:0; }
+    .kb-stripe { width:20px; height:3px; border-radius:var(--r-full); flex-shrink:0; }
+    .kb-stripe.gray   { background:var(--text-faint); }
+    .kb-stripe.blue   { background:var(--blue); }
+    .kb-stripe.orange { background:var(--orange); }
+    .kb-stripe.teal   { background:var(--primary); }
+    .kb-stripe.green  { background:var(--success); }
+    .kb-name  { font-size:.85rem; font-weight:600; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .kb-count { font-size:.72rem; background:var(--surface-off); padding:0 .4rem; border-radius:var(--r-full); color:var(--text-muted); }
+    .kb-body  { flex:1; padding:.5rem; overflow-y:auto; display:flex; flex-direction:column; gap:.4rem; min-height:40px; }
+    .kb-body.drag-over { background:var(--primary-subtle); outline:2px dashed var(--primary); outline-offset:-4px; }
+    .kb-add   { padding:.4rem .65rem; font-size:.75rem; color:var(--text-muted); display:flex; align-items:center; gap:.25rem; border-top:1px solid var(--divider); }
+    .kb-add:hover { background:var(--surface-off); color:var(--primary); }
+
+    /* ── Company card ── */
+    .co-card { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--r-md); padding:.65rem .75rem; cursor:pointer; box-shadow:var(--shadow-sm); display:flex; flex-direction:column; gap:.4rem; }
+    .co-card:hover { border-color:var(--primary); box-shadow:var(--shadow-md); }
+    .co-card.dragging { opacity:.35; cursor:grabbing; }
+    .co-card-name { font-size:.88rem; font-weight:600; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .co-card-inn  { font-size:.72rem; color:var(--text-muted); }
+    .co-card-row  { display:flex; align-items:center; justify-content:space-between; font-size:.72rem; color:var(--text-muted); }
+    .co-card-due  { display:flex; align-items:center; gap:3px; }
+    .co-card-due.overdue { color:var(--error); font-weight:500; }
+    .co-card-avatar { width:20px; height:20px; border-radius:var(--r-full); background:var(--primary-subtle); color:var(--primary); display:flex; align-items:center; justify-content:center; font-size:.6rem; font-weight:600; }
+    .kb-empty { padding:.75rem .5rem; text-align:center; font-size:.72rem; color:var(--text-faint); border:1px dashed var(--border); border-radius:var(--r-md); }
+
+    /* ── List ── */
+    .list-wrap { flex:1; overflow-y:auto; padding:1.5rem; }
+
+    /* ── Checkbox ── */
+    .cb-cell { width:36px; padding:0 !important; text-align:center; }
+    .row-cb, #cbAll {
+      width:15px; height:15px; cursor:pointer;
+      accent-color:var(--primary); vertical-align:middle;
+    }
+    tr.row-selected td { background:color-mix(in oklch,var(--primary) 5%,var(--surface)) !important; }
+    tr.row-selected:hover td { background:color-mix(in oklch,var(--primary) 9%,var(--surface)) !important; }
+
+    /* ── Dropdown ── */
+    .dropdown { position:relative; display:inline-flex; }
+    .dropdown-menu {
+      position:absolute; top:calc(100% + 4px); right:0;
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--r-lg); box-shadow:var(--shadow-md);
+      min-width:210px; z-index:100;
+      opacity:0; pointer-events:none;
+      transform:translateY(-6px);
+      transition:opacity .15s, transform .15s;
+    }
+    .dropdown-menu.open { opacity:1; pointer-events:auto; transform:translateY(0); }
+    .dropdown-section { padding:.35rem 0; }
+    .dropdown-section + .dropdown-section { border-top:1px solid var(--divider); }
+    .dropdown-label { padding:.3rem .9rem .15rem; font-size:.65rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-faint); font-weight:600; }
+    .dropdown-item {
+      display:flex; align-items:center; gap:.6rem;
+      padding:.45rem .9rem; font-size:.85rem; color:var(--text);
+      cursor:pointer; width:100%; text-align:left;
+    }
+    .dropdown-item:hover { background:var(--surface-off); }
+    .dropdown-item.danger { color:var(--error); }
+    .dropdown-item.danger:hover { background:color-mix(in oklch,var(--error) 8%,var(--surface)); }
+    .dropdown-item svg { width:14px; height:14px; flex-shrink:0; color:var(--text-muted); }
+    .dropdown-item.danger svg { color:var(--error); }
+    .dropdown-item .count-badge {
+      margin-left:auto; font-size:.7rem; font-weight:600;
+      background:var(--primary-subtle); color:var(--primary);
+      padding:1px 6px; border-radius:var(--r-full);
+    }
+    .actions-btn { display:flex; align-items:center; gap:.35rem; }
+    .actions-btn svg { width:13px; height:13px; transition:transform .15s; }
+    .actions-btn.open svg.chevron { transform:rotate(180deg); }
+
+    /* Selection info strip */
+    .sel-strip {
+      display:none; align-items:center; gap:.75rem;
+      padding:.45rem 1.5rem;
+      background:var(--primary-subtle);
+      border-bottom:1px solid color-mix(in oklch,var(--primary) 20%,var(--divider));
+      font-size:.82rem; color:var(--primary); font-weight:500;
+      flex-shrink:0;
+    }
+    .sel-strip.show { display:flex; }
+    .sel-strip button { font-size:.78rem; color:var(--primary); opacity:.7; }
+    .sel-strip button:hover { opacity:1; }
+
+    @media (max-width:900px) { .kanban { padding:.75rem 1rem; } .list-wrap { padding:1rem; } }
+    @media (max-width:600px) { .toolbar { gap:.5rem; } .search-wrap { max-width:100%; } }
+  </style>
+</head>
+<body>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <h1 class="topbar-title">Компании <span class="count" id="totalCount"></span></h1>
+
+      <a href="/import.html" class="btn btn-ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Импорт
+      </a>
+
+      <!-- Массовые действия (только head/admin, скрыт по умолчанию) -->
+      <div class="dropdown" id="bulkDropdown" style="display:none">
+        <button class="btn btn-ghost actions-btn" id="bulkToggle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+          Действия
+          <span id="bulkCountBadge" class="badge badge-teal" style="margin-left:.1rem;padding:1px 7px;font-size:.7rem">0</span>
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="dropdown-menu" id="bulkMenu">
+          <div class="dropdown-section">
+            <div class="dropdown-label">Изменить</div>
+            <button class="dropdown-item" id="bSegment">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Сегмент
+            </button>
+            <button class="dropdown-item" id="bPriority">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+              Приоритет
+            </button>
+            <button class="dropdown-item" id="bOwner">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Ответственный
+            </button>
+            <button class="dropdown-item" id="bTag">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+              Добавить тег
+            </button>
+            <button class="dropdown-item" id="bNextAction">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Поставить задачу
+            </button>
+          </div>
+          <div class="dropdown-section">
+            <button class="dropdown-item danger" id="bDelete">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+              Удалить выбранные
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <a href="/company.html?new=1" class="btn btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Добавить
+      </a>
+    </header>
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="searchInput" class="search-input" placeholder="Поиск по названию, ИНН…">
+      </div>
+      <select id="fSegment" class="filter-select"><option value="">Все сегменты</option></select>
+      <select id="fPriority" class="filter-select">
+        <option value="">Все приоритеты</option>
+        <option value="high">Высокий</option>
+        <option value="medium">Средний</option>
+        <option value="low">Низкий</option>
+      </select>
+      <div class="toolbar-right">
+        <div class="view-toggle">
+          <button class="view-btn active" id="viewKanban" title="Канбан">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="6" height="18"/><rect x="11" y="3" width="6" height="11"/></svg>
+          </button>
+          <button class="view-btn" id="viewList" title="Таблица">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Selection strip (показывается когда что-то выбрано) -->
+    <div class="sel-strip" id="selStrip">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      <span id="selStripText">0 компаний выбрано</span>
+      <button id="selClear" style="margin-left:.25rem">Снять выбор</button>
+    </div>
+
+    <div class="content-bare">
+      <div class="kanban" id="kanbanView"></div>
+      <div class="list-wrap" id="listView" style="display:none">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr>
+              <th class="cb-cell"><input type="checkbox" id="cbAll" class="row-cb"></th>
+              <th>Компания</th>
+              <th>Сегмент</th>
+              <th>Приоритет</th>
+              <th>ИНН</th>
+              <th>Следующий шаг</th>
+              <th>Обновлена</th>
+            </tr></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: массовое действие -->
+  <div class="modal-backdrop" id="bulkModal">
+    <div class="modal modal-sm">
+      <div class="modal-head">
+        <h3 class="modal-title" id="bulkModalTitle">Действие</h3>
+        <button class="icon-btn" id="bulkModalX"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="modal-body" id="bulkModalBody"></div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" id="bulkModalCancel">Отмена</button>
+        <button class="btn btn-primary" id="bulkModalOk">Применить</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    import { initUI, esc, fmtDate, toast, todayStr } from '/js/ui.js';
+    import { searchCompanies, updateCompany, SEGMENT_LABELS, SEGMENT_COLORS, PRIORITY_LABELS } from '/js/companies.js';
+    import { dbGetAll } from '/js/db.js';
+    import { can, ROLES } from '/js/auth.js';
+
+    const session = await initUI({ active: 'companies' });
+    if (!session) throw new Error('no session');
+
+    const isHead = can([ROLES.ADMIN, ROLES.HEAD]);
+
+    // Показываем кнопку действий только head/admin
+    if (isHead) document.getElementById('bulkDropdown').style.display = 'inline-flex';
+
+    // Заполняем сегменты
+    const segSel = document.getElementById('fSegment');
+    Object.entries(SEGMENT_LABELS).forEach(([v,l]) => {
+      segSel.insertAdjacentHTML('beforeend', `<option value="${v}">${l}</option>`);
+    });
+
+    let companies = [], users = [], viewMode = 'kanban';
+
+    async function load() {
+      const q   = document.getElementById('searchInput').value;
+      const seg = document.getElementById('fSegment').value;
+      const pri = document.getElementById('fPriority').value;
+      companies = await searchCompanies({ query:q, segment:seg, priority:pri });
+      document.getElementById('totalCount').textContent = companies.length ? `(${companies.length})` : '';
+      clearSelection();
+      viewMode === 'kanban' ? renderKanban() : renderList();
+    }
+
+    const SEGS = Object.keys(SEGMENT_LABELS);
+    let dragId = null;
+
+    users = await dbGetAll('users').catch(() => []);
+    const userById = Object.fromEntries(users.map(u => [u.id, u]));
+    await load();
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Kanban
+    // ─────────────────────────────────────────────────────────────────────────
+
+    function renderKanban() {
+      const bySegment = Object.fromEntries(SEGS.map(s => [s, []]));
+      companies.forEach(c => { if (bySegment[c.segment]) bySegment[c.segment].push(c); });
+      const today = todayStr();
+
+      document.getElementById('kanbanView').innerHTML = SEGS.map(seg => {
+        const items = bySegment[seg];
+        const color = SEGMENT_COLORS[seg] || 'gray';
+        const cards = items.length
+          ? items.map(c => {
+              const owner = userById[c.owner_id];
+              const ini = owner ? ((owner.first_name?.[0]||'')+(owner.last_name?.[0]||'')).toUpperCase()||'?' : '?';
+              const ov  = c.next_action_at && c.next_action_at < today ? 'overdue' : '';
+              return `<div class="co-card" draggable="true" data-id="${c.id}" data-seg="${c.segment}">
+                <div class="co-card-name">${esc(c.name)}</div>
+                ${c.inn ? `<div class="co-card-inn">ИНН ${esc(c.inn)}</div>` : ''}
+                <div class="co-card-row">
+                  <span class="co-card-due ${ov}">${c.next_action_at ? '⏰ '+fmtDate(c.next_action_at) : ''}</span>
+                  <div class="co-card-avatar" title="${esc(owner?.first_name||'')}">${ini}</div>
+                </div>
+              </div>`;
+            }).join('')
+          : `<div class="kb-empty">Нет компаний</div>`;
+
+        return `<div class="kb-col" data-seg="${seg}">
+          <div class="kb-head">
+            <div class="kb-stripe ${color}"></div>
+            <div class="kb-name">${SEGMENT_LABELS[seg]}</div>
+            <div class="kb-count">${items.length}</div>
+          </div>
+          <div class="kb-body" data-drop-seg="${seg}">${cards}</div>
+          <button class="kb-add" data-add-seg="${seg}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Добавить
+          </button>
+        </div>`;
+      }).join('');
+
+      attachDrag();
+    }
+
+    function attachDrag() {
+      document.querySelectorAll('.co-card').forEach(card => {
+        card.addEventListener('dragstart', e => { dragId = card.dataset.id; card.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
+        card.addEventListener('dragend',  () => { card.classList.remove('dragging'); dragId=null; document.querySelectorAll('.kb-body.drag-over').forEach(c=>c.classList.remove('drag-over')); });
+        card.addEventListener('click', () => location.href = `/company.html?id=${card.dataset.id}`);
+      });
+      document.querySelectorAll('.kb-body').forEach(col => {
+        col.addEventListener('dragover', e => { if (!dragId) return; e.preventDefault(); col.classList.add('drag-over'); });
+        col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+        col.addEventListener('drop', async e => {
+          e.preventDefault(); col.classList.remove('drag-over');
+          const newSeg = col.dataset.dropSeg;
+          if (!dragId || !newSeg) return;
+          const co = companies.find(c => c.id === dragId);
+          if (!co || co.segment === newSeg) return;
+          try { await updateCompany(dragId, { ...co, segment:newSeg }); await load(); toast('Сегмент изменён'); }
+          catch (err) { toast(err.message, 'error'); }
+        });
+      });
+      document.getElementById('kanbanView').addEventListener('click', e => {
+        const addBtn = e.target.closest('[data-add-seg]');
+        if (addBtn) location.href = `/company.html?new=1&segment=${addBtn.dataset.addSeg}`;
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // List + чекбоксы
+    // ─────────────────────────────────────────────────────────────────────────
+    function renderList() {
+      if (!companies.length) {
+        document.getElementById('tableBody').innerHTML =
+          `<tr><td colspan="7"><div class="empty-state">
+            <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1"/><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>
+            <h3>Компаний не найдено</h3>
+            <p>Попробуйте изменить фильтры или создайте первую компанию.</p>
+            <a href="/company.html?new=1" class="btn btn-primary">Добавить компанию</a>
+          </div></td></tr>`;
+        return;
+      }
+      const today = todayStr();
+      document.getElementById('tableBody').innerHTML = companies.map(c => {
+        const ov = c.next_action_at && c.next_action_at < today ? 'style="color:var(--error)"' : '';
+        return `<tr data-id="${c.id}">
+          <td class="cb-cell"><input type="checkbox" class="row-cb" data-id="${c.id}"></td>
+          <td><div style="font-weight:500">${esc(c.name)}</div>${c.inn?`<div style="font-size:.75rem;color:var(--text-muted)">ИНН ${esc(c.inn)}</div>`:''}</td>
+          <td><span class="badge badge-${SEGMENT_COLORS[c.segment]||'gray'}"><span class="badge-dot"></span>${SEGMENT_LABELS[c.segment]||c.segment}</span></td>
+          <td><span class="priority-dot priority-${c.priority||'medium'}" style="margin-right:4px"></span>${PRIORITY_LABELS[c.priority]||''}</td>
+          <td style="color:var(--text-muted)">${esc(c.inn||'—')}</td>
+          <td ${ov}>${c.next_action_at?fmtDate(c.next_action_at):'—'}</td>
+          <td style="color:var(--text-muted)">${fmtDate(c.updated_at)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Клик по строке таблицы
+    document.getElementById('tableBody').addEventListener('click', e => {
+      if (e.target.classList.contains('row-cb')) { updateSelection(); return; }
+      const tr = e.target.closest('tr[data-id]');
+      if (tr) location.href = `/company.html?id=${tr.dataset.id}`;
+    });
+
+    // Выбрать все
+    document.getElementById('cbAll').addEventListener('change', e => {
+      document.querySelectorAll('.row-cb').forEach(cb => { cb.checked = e.target.checked; });
+      updateSelection();
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Selection state
+    // ─────────────────────────────────────────────────────────────────────────
+    function getSelected() {
+      return [...document.querySelectorAll('.row-cb:checked')].map(cb => cb.dataset.id);
+    }
+
+    function clearSelection() {
+      document.querySelectorAll('.row-cb').forEach(cb => { cb.checked = false; });
+      const cbAll = document.getElementById('cbAll');
+      if (cbAll) { cbAll.checked = false; cbAll.indeterminate = false; }
+      updateSelection();
+    }
+
+    function updateSelection() {
+      const sel  = getSelected();
+      const all  = document.querySelectorAll('.row-cb');
+      const n    = sel.length;
+
+      // Подсветка строк
+      document.querySelectorAll('tr[data-id]').forEach(tr => {
+        const cb = tr.querySelector('.row-cb');
+        tr.classList.toggle('row-selected', !!cb?.checked);
+      });
+
+      // cbAll indeterminate
+      const cbAll = document.getElementById('cbAll');
+      if (cbAll) {
+        cbAll.indeterminate = n > 0 && n < all.length;
+        cbAll.checked = all.length > 0 && n === all.length;
+      }
+
+      // Selection strip
+      const strip = document.getElementById('selStrip');
+      strip.classList.toggle('show', n > 0 && viewMode === 'list');
+      document.getElementById('selStripText').textContent =
+        n + ' ' + (n === 1 ? 'компания выбрана' : n < 5 ? 'компании выбраны' : 'компаний выбрано');
+
+      // Badge на кнопке
+      document.getElementById('bulkCountBadge').textContent = n;
+      document.getElementById('bulkCountBadge').style.display = n > 0 ? '' : 'none';
+    }
+
+    document.getElementById('selClear').addEventListener('click', clearSelection);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Dropdown
+    // ─────────────────────────────────────────────────────────────────────────
+    const bulkToggle = document.getElementById('bulkToggle');
+    const bulkMenu   = document.getElementById('bulkMenu');
+
+    bulkToggle.addEventListener('click', e => {
+      e.stopPropagation();
+      const open = bulkMenu.classList.toggle('open');
+      bulkToggle.classList.toggle('open', open);
+    });
+    document.addEventListener('click', () => {
+      bulkMenu.classList.remove('open');
+      bulkToggle.classList.remove('open');
+    });
+    bulkMenu.addEventListener('click', e => e.stopPropagation());
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Bulk modal helpers
+    // ─────────────────────────────────────────────────────────────────────────
+    function closeBulkMenu() {
+      bulkMenu.classList.remove('open');
+      bulkToggle.classList.remove('open');
+    }
+
+    function openBulkModal(title, bodyHtml, onOk, dangerOk = false) {
+      const sel = getSelected();
+      if (!sel.length) { toast('Выберите компании в таблице', 'error'); closeBulkMenu(); return; }
+
+      document.getElementById('bulkModalTitle').textContent = title + ` (${sel.length})`;
+      document.getElementById('bulkModalBody').innerHTML    = bodyHtml;
+      document.getElementById('bulkModal').classList.add('open');
+
+      const okBtn = document.getElementById('bulkModalOk');
+      okBtn.className = dangerOk ? 'btn btn-danger' : 'btn btn-primary';
+      okBtn.textContent = dangerOk ? 'Удалить' : 'Применить';
+      okBtn.onclick = async () => {
+        const result = await onOk();
+        if (result !== false) document.getElementById('bulkModal').classList.remove('open');
+      };
+      closeBulkMenu();
+      setTimeout(() => document.querySelector('#bulkModalBody input, #bulkModalBody select')?.focus(), 80);
+    }
+
+    function closeBulkModal() { document.getElementById('bulkModal').classList.remove('open'); }
+    document.getElementById('bulkModalCancel').addEventListener('click', closeBulkModal);
+    document.getElementById('bulkModalX').addEventListener('click', closeBulkModal);
+    document.getElementById('bulkModal').addEventListener('click', e => { if (e.target===document.getElementById('bulkModal')) closeBulkModal(); });
+
+    async function bulkApply(action, value) {
+      const ids = getSelected();
+      try {
+        const res = await fetch('/api/companies/bulk', {
+          method:'POST', credentials:'include',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ ids, action, value }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        toast(`Изменено: ${data.affected} компаний`, 'success');
+        clearSelection();
+        await load();
+      } catch(err) { toast(err.message, 'error'); }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Bulk actions
+    // ─────────────────────────────────────────────────────────────────────────
+    document.getElementById('bSegment').addEventListener('click', () => {
+      const opts = Object.entries(SEGMENT_LABELS)
+        .map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+      openBulkModal('Изменить сегмент',
+        `<div class="field"><label class="field-label">Новый сегмент</label>
+         <select id="bVal" class="select">${opts}</select></div>`,
+        () => bulkApply('segment', document.getElementById('bVal').value)
+      );
+    });
+
+    document.getElementById('bPriority').addEventListener('click', () => {
+      openBulkModal('Изменить приоритет',
+        `<div class="field"><label class="field-label">Новый приоритет</label>
+         <select id="bVal" class="select">
+           <option value="high">Высокий</option>
+           <option value="medium" selected>Средний</option>
+           <option value="low">Низкий</option>
+         </select></div>`,
+        () => bulkApply('priority', document.getElementById('bVal').value)
+      );
+    });
+
+    document.getElementById('bOwner').addEventListener('click', () => {
+      const opts = users
+        .filter(u => u.is_active)
+        .map(u => `<option value="${u.id}">${esc([u.first_name,u.last_name].filter(Boolean).join(' ')||u.email)}</option>`)
+        .join('');
+      openBulkModal('Переназначить ответственного',
+        `<div class="field"><label class="field-label">Новый ответственный</label>
+         <select id="bVal" class="select">${opts}</select></div>`,
+        () => bulkApply('owner', document.getElementById('bVal').value)
+      );
+    });
+
+    document.getElementById('bTag').addEventListener('click', () => {
+      openBulkModal('Добавить тег',
+        `<div class="field"><label class="field-label">Тег</label>
+         <input id="bVal" class="input" placeholder="Введите тег…">
+         <div style="font-size:.75rem;color:var(--text-muted);margin-top:.3rem">
+           Добавится к каждой компании, если тега ещё нет.</div></div>`,
+        () => {
+          const val = document.getElementById('bVal').value.trim();
+          if (!val) { toast('Введите тег', 'error'); return false; }
+          return bulkApply('tag', val);
+        }
+      );
+    });
+
+    document.getElementById('bNextAction').addEventListener('click', () => {
+      openBulkModal('Поставить задачу',
+        `<div class="form-grid form-grid-2">
+           <div class="field"><label class="field-label">Тип</label>
+             <select id="bType" class="select">
+               <option value="call_out">Позвонить</option>
+               <option value="email_out">Написать письмо</option>
+               <option value="meeting">Встреча</option>
+               <option value="proposal">Отправить КП</option>
+             </select>
+           </div>
+           <div class="field"><label class="field-label">Дата</label>
+             <input id="bVal" type="date" class="input" value="${new Date().toISOString().split('T')[0]}">
+           </div>
+         </div>`,
+        () => {
+          const date = document.getElementById('bVal').value;
+          if (!date) { toast('Укажите дату', 'error'); return false; }
+          return bulkApply('next_action', { date, type: document.getElementById('bType').value });
+        }
+      );
+    });
+
+    document.getElementById('bDelete').addEventListener('click', () => {
+      const n = getSelected().length;
+      openBulkModal('Удалить компании',
+        `<div style="font-size:.9em;line-height:1.6">
+           Вы собираетесь удалить <strong style="color:var(--error)">${n}</strong> компаний
+           вместе со всеми контактами, сделками и активностями.<br><br>
+           <strong>Это действие необратимо.</strong>
+         </div>`,
+        () => bulkApply('delete', null),
+        true
+      );
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Toolbar / view toggle
+    // ─────────────────────────────────────────────────────────────────────────
+    let searchTimer;
+    document.getElementById('searchInput').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(load, 220); });
+    document.getElementById('fSegment').addEventListener('change', load);
+    document.getElementById('fPriority').addEventListener('change', load);
+
+    document.getElementById('viewKanban').addEventListener('click', () => {
+      viewMode = 'kanban';
+      document.getElementById('viewKanban').classList.add('active');
+      document.getElementById('viewList').classList.remove('active');
+      document.getElementById('kanbanView').style.display = 'flex';
+      document.getElementById('listView').style.display  = 'none';
+      document.getElementById('selStrip').classList.remove('show');
+      renderKanban();
+    });
+    document.getElementById('viewList').addEventListener('click', () => {
+      viewMode = 'list';
+      document.getElementById('viewList').classList.add('active');
+      document.getElementById('viewKanban').classList.remove('active');
+      document.getElementById('kanbanView').style.display = 'none';
+      document.getElementById('listView').style.display  = 'flex';
+      renderList();
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.target.matches('input,textarea,select')) return;
+      if (e.key === 'n' || e.key === 'т') location.href = '/company.html?new=1';
+      if (e.key === 'Escape') clearSelection();
+    });
+  </script>
+</body>
+</html>

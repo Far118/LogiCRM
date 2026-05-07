@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Запросы — LogiCRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    html { visibility: hidden; }
+    /* Kanban */
+    .kanban { display:flex; gap:.65rem; padding:1rem 1.5rem; overflow-x:auto; overflow-y:hidden; flex:1; min-height:0; }
+    .kb-col  { width:240px; flex-shrink:0; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); display:flex; flex-direction:column; max-height:100%; overflow:hidden; }
+    .kb-head { padding:.55rem .85rem; border-bottom:1px solid var(--divider); display:flex; align-items:center; gap:.4rem; flex-shrink:0; }
+    .kb-stripe { width:18px; height:3px; border-radius:var(--r-full); flex-shrink:0; }
+    .kb-name  { font-size:.8rem; font-weight:600; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .kb-count { font-size:.68rem; background:var(--surface-off); padding:0 .35rem; border-radius:var(--r-full); color:var(--text-muted); }
+    .kb-body  { flex:1; padding:.4rem; overflow-y:auto; display:flex; flex-direction:column; gap:.35rem; min-height:40px; }
+    .kb-sum   { padding:.3rem .6rem; font-size:.68rem; color:var(--text-faint); border-top:1px solid var(--divider); flex-shrink:0; }
+
+    /* Request card */
+    .req-card { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--r-md); padding:.6rem .75rem; cursor:pointer; display:flex; flex-direction:column; gap:.3rem; }
+    .req-card:hover { border-color:var(--primary); box-shadow:var(--shadow-sm); }
+    .req-route { font-size:.85rem; font-weight:600; line-height:1.3; }
+    .req-route .arrow { color:var(--primary); margin:0 .25rem; }
+    .req-co   { font-size:.7rem; color:var(--primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .req-row  { display:flex; align-items:center; justify-content:space-between; font-size:.7rem; color:var(--text-muted); }
+    .req-cargo { display:flex; align-items:center; gap:.25rem; }
+    .req-rate  { font-weight:600; color:var(--text); }
+    .req-date  { font-size:.68rem; color:var(--text-faint); }
+    .req-date.soon { color:var(--warning); font-weight:500; }
+    .req-date.late { color:var(--error); font-weight:500; }
+    .badge-transport { padding:1px .4rem; border-radius:var(--r-full); font-size:.65rem; font-weight:600; }
+    .t-auto   { background:color-mix(in oklch, var(--blue) 12%, var(--surface));    color:var(--blue); }
+    .t-rail   { background:color-mix(in oklch, var(--orange) 12%, var(--surface));  color:var(--orange); }
+    .t-sea    { background:color-mix(in oklch, var(--primary) 12%, var(--surface)); color:var(--primary); }
+    .t-air    { background:color-mix(in oklch, var(--error) 12%, var(--surface));   color:var(--error); }
+    .t-multi  { background:color-mix(in oklch, var(--success) 12%, var(--surface)); color:var(--success); }
+
+    /* Status stripe colors */
+    .s-new        { background:var(--text-faint); }
+    .s-calculating{ background:var(--orange); }
+    .s-quoted     { background:var(--blue); }
+    .s-won        { background:var(--success); }
+    .s-lost       { background:var(--error); }
+    .s-cancelled  { background:var(--text-faint); opacity:.4; }
+
+    /* List view */
+    .list-wrap { flex:1; overflow-y:auto; padding:1.5rem; }
+
+    /* Calculator panel */
+    .calc-panel {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--r-lg); padding:1.25rem;
+      display:flex; flex-direction:column; gap:1rem;
+      box-shadow:var(--shadow-md);
+    }
+    .calc-result {
+      background:var(--primary-subtle); border:1px solid var(--primary);
+      border-radius:var(--r-md); padding:.75rem 1rem;
+      display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:.75rem;
+    }
+    .calc-num  { font-size:1.25rem; font-weight:700; color:var(--text); }
+    .calc-lbl  { font-size:.72rem; color:var(--text-muted); }
+    .margin-bar { height:6px; border-radius:var(--r-full); background:var(--surface-off); overflow:hidden; margin-top:.4rem; }
+    .margin-fill { height:100%; border-radius:var(--r-full); background:var(--success); transition:width .3s; }
+    .margin-fill.warn { background:var(--warning); }
+    .margin-fill.bad  { background:var(--error); }
+
+    @media (max-width:900px) { .kanban { padding:.75rem 1rem; } .list-wrap { padding:1rem; } }
+  </style>
+</head>
+<body>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <h1 class="topbar-title">Запросы <span class="count" id="totalCount"></span></h1>
+      <button class="btn btn-primary" id="btnNew">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Новый запрос
+      </button>
+    </header>
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="searchInput" class="search-input" placeholder="Маршрут, груз, компания…">
+      </div>
+      <select id="fTransport" class="filter-select">
+        <option value="">Все типы</option>
+        <option value="auto">Авто</option>
+        <option value="rail">ЖД</option>
+        <option value="sea">Море</option>
+        <option value="air">Авиа</option>
+        <option value="multimodal">Мультимодал</option>
+      </select>
+      <div class="toolbar-right">
+        <div class="view-toggle">
+          <button class="view-btn active" id="viewKanban" title="Канбан">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="6" height="18"/><rect x="11" y="3" width="6" height="11"/></svg>
+          </button>
+          <button class="view-btn" id="viewList" title="Таблица">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <button class="view-btn" id="viewCalc" title="Калькулятор">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/><line x1="14" y1="18" x2="16" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-bare">
+      <!-- Kanban -->
+      <div class="kanban" id="kanbanView"></div>
+
+      <!-- List -->
+      <div class="list-wrap" id="listView" style="display:none">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr>
+              <th>Маршрут</th>
+              <th>Компания</th>
+              <th>Груз</th>
+              <th>Тип</th>
+              <th>Дата погрузки</th>
+              <th>Наша ставка</th>
+              <th>Маржа</th>
+              <th>Статус</th>
+            </tr></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Calculator -->
+      <div class="content" id="calcView" style="display:none">
+        <div style="max-width:640px">
+          <div class="calc-panel">
+            <h2 style="font-size:1em;font-weight:600">Калькулятор ставки</h2>
+            <div class="form-grid form-grid-2">
+              <div class="field"><label class="field-label">Откуда</label><input id="cFrom" class="input" placeholder="Москва"></div>
+              <div class="field"><label class="field-label">Куда</label><input id="cTo" class="input" placeholder="Новосибирск"></div>
+              <div class="field"><label class="field-label">Расстояние, км</label><input id="cDist" type="number" class="input" placeholder="3000"></div>
+              <div class="field"><label class="field-label">Тип транспорта</label>
+                <select id="cTransport" class="select">
+                  <option value="auto">Авто (FTL)</option>
+                  <option value="auto_ltl">Авто (LTL, сборный)</option>
+                  <option value="rail">ЖД</option>
+                  <option value="sea">Море</option>
+                  <option value="air">Авиа</option>
+                </select>
+              </div>
+              <div class="field"><label class="field-label">Вес, кг</label><input id="cWeight" type="number" class="input" placeholder="10000"></div>
+              <div class="field"><label class="field-label">Объём, м³</label><input id="cVolume" type="number" class="input" placeholder="40"></div>
+              <div class="field"><label class="field-label">Ставка перевозчика</label><input id="cCarrierRate" type="number" class="input" placeholder="85000"></div>
+              <div class="field"><label class="field-label">Доп. услуги</label><input id="cExtra" type="number" class="input" placeholder="5000" title="Таможня, страховка, экспедирование…"></div>
+              <div class="field"><label class="field-label">Наценка, %</label><input id="cMarkup" type="number" class="input" value="15" min="0" max="200"></div>
+              <div class="field"><label class="field-label">Скидка, %</label><input id="cDiscount" type="number" class="input" value="0" min="0" max="100"></div>
+            </div>
+            <button class="btn btn-primary" id="calcBtn">Рассчитать</button>
+
+            <div class="calc-result" id="calcResult" style="display:none">
+              <div>
+                <div class="calc-num" id="rClientRate">—</div>
+                <div class="calc-lbl">Ставка клиенту</div>
+              </div>
+              <div>
+                <div class="calc-num" id="rMargin">—</div>
+                <div class="calc-lbl">Маржа ₽</div>
+              </div>
+              <div>
+                <div class="calc-num" id="rMarginPct">—</div>
+                <div class="calc-lbl">Маржа %</div>
+              </div>
+              <div>
+                <div class="calc-num" id="rPerKm">—</div>
+                <div class="calc-lbl">₽/км</div>
+              </div>
+            </div>
+            <div id="marginBarWrap" style="display:none">
+              <div class="margin-bar"><div class="margin-fill" id="marginFill"></div></div>
+              <div style="font-size:.72rem;color:var(--text-muted);margin-top:.3rem" id="marginComment"></div>
+            </div>
+            <button class="btn btn-ghost btn-sm" id="calcToRequest" style="display:none">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Создать запрос с этими данными
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Запрос -->
+  <div class="modal-backdrop" id="reqModal">
+    <div class="modal" style="max-width:680px">
+      <div class="modal-head">
+        <h3 class="modal-title" id="modalTitle">Новый запрос</h3>
+        <button class="icon-btn" id="modalClose"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="modal-body" style="gap:.75rem">
+        <input type="hidden" id="rId">
+
+        <div class="section-title" style="margin:0">Маршрут</div>
+        <div class="form-grid form-grid-3">
+          <div class="field"><label class="field-label">Откуда <span class="req">*</span></label><input id="rFrom" class="input" placeholder="Москва"></div>
+          <div class="field"><label class="field-label">Куда <span class="req">*</span></label><input id="rTo" class="input" placeholder="Новосибирск"></div>
+          <div class="field"><label class="field-label">Через (транзит)</label><input id="rVia" class="input" placeholder="Екатеринбург"></div>
+          <div class="field"><label class="field-label">Расстояние, км</label><input id="rDist" type="number" class="input"></div>
+          <div class="field"><label class="field-label">Тип транспорта</label>
+            <select id="rTransport" class="select">
+              <option value="auto">Авто (FTL)</option>
+              <option value="auto_ltl">Авто (LTL)</option>
+              <option value="rail">ЖД</option>
+              <option value="sea">Море</option>
+              <option value="air">Авиа</option>
+              <option value="multimodal">Мультимодал</option>
+            </select>
+          </div>
+          <div class="field"><label class="field-label">Incoterms</label>
+            <select id="rIncoterms" class="select">
+              <option value="">—</option>
+              <option>EXW</option><option>FCA</option><option>CPT</option>
+              <option>CIP</option><option>DAP</option><option>DPU</option>
+              <option>DDP</option><option>FAS</option><option>FOB</option>
+              <option>CFR</option><option>CIF</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="section-title" style="margin:.5rem 0 0">Груз</div>
+        <div class="form-grid form-grid-3">
+          <div class="field"><label class="field-label">Тип груза</label>
+            <select id="rCargoType" class="select">
+              <option value="general">Генеральный</option>
+              <option value="bulk">Насыпной</option>
+              <option value="oversize">Негабарит</option>
+              <option value="adr">Опасный (ADR)</option>
+              <option value="reefer">Рефрижератор</option>
+              <option value="valuable">Ценный</option>
+              <option value="docs">Документы</option>
+            </select>
+          </div>
+          <div class="field"><label class="field-label">Вес, кг</label><input id="rWeight" type="number" class="input" placeholder="10 000"></div>
+          <div class="field"><label class="field-label">Объём, м³</label><input id="rVolume" type="number" class="input" placeholder="40"></div>
+          <div class="field"><label class="field-label">Мест</label><input id="rPlaces" type="number" class="input"></div>
+          <div class="field"><label class="field-label">Ценность, ₽</label><input id="rValue" type="number" class="input"></div>
+          <div class="field"><label class="field-label">Темп. режим</label><input id="rTemp" class="input" placeholder="+2…+8°C"></div>
+        </div>
+        <div style="display:flex;gap:1.5rem;font-size:.88em">
+          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer"><input type="checkbox" id="rAdr"> ADR / опасный</label>
+          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer"><input type="checkbox" id="rOversized"> Негабарит</label>
+          <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer"><input type="checkbox" id="rRegular"> Регулярная отправка</label>
+        </div>
+        <div class="field"><label class="field-label">Описание груза</label><textarea id="rCargoDesc" class="textarea" rows="2" placeholder="Оборудование, паллеты на деревянных поддонах…"></textarea></div>
+
+        <div class="section-title" style="margin:.5rem 0 0">Сроки и ставки</div>
+        <div class="form-grid form-grid-3">
+          <div class="field"><label class="field-label">Дата погрузки</label><input id="rLoadDate" type="date" class="input"></div>
+          <div class="field"><label class="field-label">Дата доставки (желаемая)</label><input id="rDelivDate" type="date" class="input"></div>
+          <div class="field"><label class="field-label">Бюджет клиента</label><input id="rBudget" type="number" class="input"></div>
+          <div class="field"><label class="field-label">Ставка перевозчика</label><input id="rCarrierRate" type="number" class="input" oninput="recalcMargin()"></div>
+          <div class="field"><label class="field-label">Наша ставка клиенту</label><input id="rOurRate" type="number" class="input" oninput="recalcMargin()"></div>
+          <div class="field"><label class="field-label">Маржа</label>
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <input id="rMargin" type="number" class="input" readonly style="background:var(--surface-off);flex:1">
+              <span id="rMarginPct" style="font-weight:600;color:var(--text-muted);white-space:nowrap;min-width:45px"></span>
+            </div>
+          </div>
+          <div class="field"><label class="field-label">Валюта</label>
+            <select id="rCurrency" class="select"><option value="RUB">RUB ₽</option><option value="USD">USD $</option><option value="EUR">EUR €</option></select>
+          </div>
+        </div>
+
+        <div class="section-title" style="margin:.5rem 0 0">Связи и ответственность</div>
+        <div class="form-grid form-grid-2">
+          <div class="field"><label class="field-label">Компания</label><select id="rCompany" class="select"><option value="">— не выбрана —</option></select></div>
+          <div class="field"><label class="field-label">Перевозчик</label><select id="rCarrier" class="select"><option value="">— не выбран —</option></select></div>
+          <div class="field"><label class="field-label">Ответственный</label><select id="rOwner" class="select"></select></div>
+          <div class="field"><label class="field-label">Статус</label>
+            <select id="rStatus" class="select">
+              <option value="new">Новый</option>
+              <option value="calculating">Расчёт</option>
+              <option value="quoted">КП отправлено</option>
+              <option value="won">Выиграли</option>
+              <option value="lost">Проиграли</option>
+              <option value="cancelled">Отменён</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label class="field-label">Примечания</label><textarea id="rNotes" class="textarea" rows="2"></textarea></div>
+      </div>
+      <div class="modal-foot">
+        <div class="modal-foot-left">
+          <button class="btn btn-danger" id="btnDeleteReq" hidden>Удалить</button>
+        </div>
+        <button class="btn btn-ghost" id="rCancel">Отмена</button>
+        <button class="btn btn-primary" id="rSave">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module">
+    import { initUI, esc, fmtDate, toast, todayStr } from '/js/ui.js';
+    import { getCompanies } from '/js/companies.js';
+    import { dbGetAll } from '/js/db.js';
+    import { can, ROLES } from '/js/auth.js';
+
+    const session = await initUI({ active: 'requests' });
+    if (!session) throw new Error('no session');
+
+    const STATUS_LABELS = { new:'Новый', calculating:'Расчёт', quoted:'КП отправлено', won:'Выиграли', lost:'Проиграли', cancelled:'Отменён' };
+    const STATUS_COLORS = { new:'gray', calculating:'orange', quoted:'blue', won:'green', lost:'red', cancelled:'gray' };
+    const STATUS_STRIPES = { new:'gray', calculating:'orange', quoted:'blue', won:'green', lost:'red', cancelled:'gray' };
+    const STATUSES = ['new','calculating','quoted','won','lost','cancelled'];
+    const TRANSPORT_LABELS = { auto:'Авто FTL', auto_ltl:'Авто LTL', rail:'ЖД', sea:'Море', air:'Авиа', multimodal:'Мульти' };
+    const TRANSPORT_CLASSES = { auto:'t-auto', auto_ltl:'t-auto', rail:'t-rail', sea:'t-sea', air:'t-air', multimodal:'t-multi' };
+
+    let requests = [], companies = [], carriers = [], users = [];
+    let viewMode = 'kanban', editingId = null;
+
+    async function api(method, path, body) {
+      const res = await fetch('/api' + path, {
+        method, credentials:'include',
+        headers: body ? {'Content-Type':'application/json'} : {},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (res.status === 204) return null;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Ошибка');
+      return data;
+    }
+
+    async function loadAll() {
+      [companies, carriers, users] = await Promise.all([
+        getCompanies(),
+        api('GET', '/carriers').catch(() => []),
+        dbGetAll('users').catch(() => []),
+      ]);
+      // Заполняем селекты
+      const coSel = document.getElementById('rCompany');
+      const caSel = document.getElementById('rCarrier');
+      const owSel = document.getElementById('rOwner');
+      coSel.innerHTML = '<option value="">— не выбрана —</option>' +
+        companies.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+      caSel.innerHTML = '<option value="">— не выбран —</option>' +
+        carriers.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+      owSel.innerHTML = users.map(u =>
+        `<option value="${u.id}" ${u.id===session.id?'selected':''}>${esc([u.first_name,u.last_name].filter(Boolean).join(' ')||u.email)}</option>`
+      ).join('');
+    }
+
+    async function load() {
+      const q = document.getElementById('searchInput').value;
+      const t = document.getElementById('fTransport').value;
+      let url = '/requests?';
+      if (q) url += `q=${encodeURIComponent(q)}&`;
+      if (t) url += `transport_type=${t}&`;
+      requests = await api('GET', url).catch(() => []);
+      document.getElementById('totalCount').textContent = requests.length ? `(${requests.length})` : '';
+      viewMode === 'kanban' ? renderKanban() : renderList();
+    }
+
+    await loadAll();
+    await load();
+
+    // ── Kanban ────────────────────────────────────────────────────────────────
+    function renderKanban() {
+      const today = todayStr();
+      const byStatus = Object.fromEntries(STATUSES.map(s => [s, []]));
+      requests.forEach(r => { if (byStatus[r.status]) byStatus[r.status].push(r); });
+
+      document.getElementById('kanbanView').innerHTML = STATUSES.map(st => {
+        const items = byStatus[st];
+        const stripeClass = 's-' + st.replace('_','-');
+        const totalRate = items.reduce((s,r) => s + Number(r.our_rate||0), 0);
+        const cards = items.length ? items.map(r => {
+          const tc = TRANSPORT_CLASSES[r.transport_type] || 't-auto';
+          const tl = TRANSPORT_LABELS[r.transport_type] || r.transport_type;
+          let dateClass = '';
+          if (r.loading_date) {
+            const diff = Math.ceil((new Date(r.loading_date) - new Date(today)) / 86400000);
+            if (diff < 0) dateClass = 'late';
+            else if (diff <= 3) dateClass = 'soon';
+          }
+          const margin_pct = r.margin_percent ? Math.round(r.margin_percent) : '';
+          return `<div class="req-card" data-id="${r.id}">
+            <div class="req-route">${esc(r.route_from)} <span class="arrow">→</span> ${esc(r.route_to)}</div>
+            ${r.company_name ? `<div class="req-co">${esc(r.company_name)}</div>` : ''}
+            <div class="req-row">
+              <span class="badge-transport ${tc}">${tl}</span>
+              ${r.our_rate ? `<span class="req-rate">${Number(r.our_rate).toLocaleString('ru-RU')} ₽${margin_pct?' · '+margin_pct+'%':''}</span>` : ''}
+            </div>
+            <div class="req-row">
+              <span class="req-cargo">
+                ${r.weight_kg ? `<span>${Number(r.weight_kg).toLocaleString('ru-RU')} кг</span>` : ''}
+                ${r.volume_m3 ? `<span>· ${r.volume_m3} м³</span>` : ''}
+              </span>
+              ${r.loading_date ? `<span class="req-date ${dateClass}">${fmtDate(r.loading_date)}</span>` : ''}
+            </div>
+          </div>`;
+        }).join('') : `<div style="padding:.65rem .5rem;text-align:center;font-size:.7rem;color:var(--text-faint);border:1px dashed var(--border);border-radius:var(--r-md)">Нет запросов</div>`;
+
+        return `<div class="kb-col">
+          <div class="kb-head">
+            <div class="kb-stripe ${stripeClass}"></div>
+            <div class="kb-name">${STATUS_LABELS[st]}</div>
+            <div class="kb-count">${items.length}</div>
+          </div>
+          <div class="kb-body">${cards}</div>
+          ${totalRate ? `<div class="kb-sum">${totalRate.toLocaleString('ru-RU')} ₽</div>` : ''}
+        </div>`;
+      }).join('');
+
+      document.getElementById('kanbanView').addEventListener('click', e => {
+        const card = e.target.closest('.req-card[data-id]');
+        if (card) openModal(card.dataset.id);
+      });
+    }
+
+    // ── List ──────────────────────────────────────────────────────────────────
+    function renderList() {
+      if (!requests.length) {
+        document.getElementById('tableBody').innerHTML = `<tr><td colspan="8"><div class="empty-state"><h3>Запросов нет</h3><p>Создайте первый запрос на перевозку.</p></div></td></tr>`;
+        return;
+      }
+      const today = todayStr();
+      document.getElementById('tableBody').innerHTML = requests.map(r => {
+        const tc = TRANSPORT_CLASSES[r.transport_type] || 't-auto';
+        const tl = TRANSPORT_LABELS[r.transport_type] || r.transport_type;
+        const sc = STATUS_COLORS[r.status] || 'gray';
+        const ov = r.loading_date && r.loading_date < today;
+        const mp = r.margin_percent ? Math.round(r.margin_percent) : null;
+        return `<tr data-id="${r.id}" style="cursor:pointer">
+          <td><div style="font-weight:500">${esc(r.route_from)} → ${esc(r.route_to)}</div>${r.route_via?`<div style="font-size:.72rem;color:var(--text-muted)">Через: ${esc(r.route_via)}</div>`:''}</td>
+          <td>${r.company_name ? `<a href="/company.html?id=${r.company_id}" class="card-link" onclick="event.stopPropagation()">${esc(r.company_name)}</a>` : '—'}</td>
+          <td style="font-size:.82rem">${r.weight_kg?Number(r.weight_kg).toLocaleString('ru-RU')+' кг':''}${r.volume_m3?' / '+r.volume_m3+' м³':''}</td>
+          <td><span class="badge-transport ${tc}">${tl}</span></td>
+          <td style="${ov?'color:var(--error);font-weight:500':''}">${r.loading_date?fmtDate(r.loading_date):'—'}</td>
+          <td style="font-weight:500">${r.our_rate?Number(r.our_rate).toLocaleString('ru-RU')+' ₽':'—'}</td>
+          <td>${mp!==null?`<span style="color:${mp>=15?'var(--success)':mp>=8?'var(--warning)':'var(--error)'};font-weight:500">${mp}%</span>`:'—'}</td>
+          <td><span class="badge badge-${sc}"><span class="badge-dot"></span>${STATUS_LABELS[r.status]||r.status}</span></td>
+        </tr>`;
+      }).join('');
+    }
+    document.getElementById('tableBody').addEventListener('click', e => {
+      const tr = e.target.closest('tr[data-id]');
+      if (tr && !e.target.closest('a')) openModal(tr.dataset.id);
+    });
+
+    // ── Margin recalc ─────────────────────────────────────────────────────────
+    window.recalcMargin = function() {
+      const our    = parseFloat(document.getElementById('rOurRate').value) || 0;
+      const carrier= parseFloat(document.getElementById('rCarrierRate').value) || 0;
+      if (!our || !carrier) { document.getElementById('rMargin').value=''; document.getElementById('rMarginPct').textContent=''; return; }
+      const margin = our - carrier;
+      const pct    = ((margin / our) * 100).toFixed(1);
+      document.getElementById('rMargin').value = Math.round(margin);
+      document.getElementById('rMarginPct').textContent = pct + '%';
+      document.getElementById('rMarginPct').style.color = margin >= 0 ? 'var(--success)' : 'var(--error)';
+    };
+
+    // ── Modal ─────────────────────────────────────────────────────────────────
+    function openModal(id = null) {
+      editingId = id;
+      document.getElementById('modalTitle').textContent = id ? 'Запрос на перевозку' : 'Новый запрос';
+      document.getElementById('btnDeleteReq').hidden = !id || !can([ROLES.ADMIN, ROLES.HEAD]);
+
+      if (id) {
+        const r = requests.find(x => x.id === id);
+        if (!r) return;
+        document.getElementById('rId').value       = r.id;
+        document.getElementById('rFrom').value     = r.route_from;
+        document.getElementById('rTo').value       = r.route_to;
+        document.getElementById('rVia').value      = r.route_via || '';
+        document.getElementById('rDist').value     = r.distance_km || '';
+        document.getElementById('rTransport').value= r.transport_type;
+        document.getElementById('rIncoterms').value= r.incoterms || '';
+        document.getElementById('rCargoType').value= r.cargo_type;
+        document.getElementById('rWeight').value   = r.weight_kg || '';
+        document.getElementById('rVolume').value   = r.volume_m3 || '';
+        document.getElementById('rPlaces').value   = r.places_count || '';
+        document.getElementById('rValue').value    = r.cargo_value || '';
+        document.getElementById('rTemp').value     = r.temperature_regime || '';
+        document.getElementById('rAdr').checked    = r.is_adr;
+        document.getElementById('rOversized').checked = r.is_oversized;
+        document.getElementById('rRegular').checked= r.is_regular;
+        document.getElementById('rCargoDesc').value= r.cargo_description || '';
+        document.getElementById('rLoadDate').value = r.loading_date || '';
+        document.getElementById('rDelivDate').value= r.delivery_date || '';
+        document.getElementById('rBudget').value   = r.budget || '';
+        document.getElementById('rCarrierRate').value = r.carrier_rate || '';
+        document.getElementById('rOurRate').value  = r.our_rate || '';
+        document.getElementById('rMargin').value   = r.margin || '';
+        document.getElementById('rMarginPct').textContent = r.margin_percent ? Math.round(r.margin_percent)+'%' : '';
+        document.getElementById('rCurrency').value = r.currency;
+        document.getElementById('rCompany').value  = r.company_id || '';
+        document.getElementById('rCarrier').value  = r.carrier_id || '';
+        document.getElementById('rOwner').value    = r.owner_id || session.id;
+        document.getElementById('rStatus').value   = r.status;
+        document.getElementById('rNotes').value    = r.notes || '';
+      } else {
+        document.getElementById('rId').value = '';
+        ['rFrom','rTo','rVia','rDist','rWeight','rVolume','rPlaces','rValue','rTemp',
+         'rCargoDesc','rLoadDate','rDelivDate','rBudget','rCarrierRate','rOurRate','rMargin','rNotes'].forEach(id => {
+          document.getElementById(id).value = '';
+        });
+        document.getElementById('rMarginPct').textContent = '';
+        document.getElementById('rTransport').value = 'auto';
+        document.getElementById('rCargoType').value = 'general';
+        document.getElementById('rCurrency').value  = 'RUB';
+        document.getElementById('rStatus').value    = 'new';
+        document.getElementById('rOwner').value     = session.id;
+        document.getElementById('rCompany').value   = '';
+        document.getElementById('rCarrier').value   = '';
+        ['rAdr','rOversized','rRegular'].forEach(id => { document.getElementById(id).checked = false; });
+        // Если калькулятор заполнен — подставляем
+        const calcFrom = document.getElementById('cFrom')?.value;
+        const calcTo   = document.getElementById('cTo')?.value;
+        if (calcFrom) document.getElementById('rFrom').value = calcFrom;
+        if (calcTo)   document.getElementById('rTo').value   = calcTo;
+        const ourRate  = document.getElementById('rClientRate')?.textContent;
+        if (ourRate && ourRate !== '—') {
+          const num = ourRate.replace(/[^\d]/g,'');
+          if (num) document.getElementById('rOurRate').value = num;
+        }
+      }
+
+      document.getElementById('reqModal').classList.add('open');
+      document.getElementById('rFrom').focus();
+    }
+
+    function closeModal() { document.getElementById('reqModal').classList.remove('open'); editingId = null; }
+    document.getElementById('modalClose').addEventListener('click', closeModal);
+    document.getElementById('rCancel').addEventListener('click', closeModal);
+    document.getElementById('reqModal').addEventListener('click', e => { if (e.target === document.getElementById('reqModal')) closeModal(); });
+
+    function getFormData() {
+      const our     = parseFloat(document.getElementById('rOurRate').value)     || 0;
+      const carrier = parseFloat(document.getElementById('rCarrierRate').value) || 0;
+      const margin  = our - carrier;
+      const marginPct = our ? +((margin / our) * 100).toFixed(2) : 0;
+      return {
+        route_from:    document.getElementById('rFrom').value.trim(),
+        route_to:      document.getElementById('rTo').value.trim(),
+        route_via:     document.getElementById('rVia').value.trim(),
+        distance_km:   parseInt(document.getElementById('rDist').value)   || null,
+        transport_type:document.getElementById('rTransport').value,
+        incoterms:     document.getElementById('rIncoterms').value,
+        cargo_type:    document.getElementById('rCargoType').value,
+        cargo_description: document.getElementById('rCargoDesc').value,
+        weight_kg:     parseFloat(document.getElementById('rWeight').value) || null,
+        volume_m3:     parseFloat(document.getElementById('rVolume').value) || null,
+        places_count:  parseInt(document.getElementById('rPlaces').value)   || null,
+        cargo_value:   parseFloat(document.getElementById('rValue').value)  || null,
+        is_adr:        document.getElementById('rAdr').checked,
+        is_oversized:  document.getElementById('rOversized').checked,
+        temperature_regime: document.getElementById('rTemp').value,
+        loading_date:  document.getElementById('rLoadDate').value || null,
+        delivery_date: document.getElementById('rDelivDate').value || null,
+        is_regular:    document.getElementById('rRegular').checked,
+        budget:        parseFloat(document.getElementById('rBudget').value) || null,
+        carrier_rate:  carrier || null,
+        our_rate:      our     || null,
+        margin:        margin  || null,
+        margin_percent:marginPct || null,
+        currency:      document.getElementById('rCurrency').value,
+        company_id:    document.getElementById('rCompany').value   || null,
+        carrier_id:    document.getElementById('rCarrier').value   || null,
+        owner_id:      document.getElementById('rOwner').value,
+        status:        document.getElementById('rStatus').value,
+        notes:         document.getElementById('rNotes').value,
+      };
+    }
+
+    document.getElementById('rSave').addEventListener('click', async () => {
+      const data = getFormData();
+      if (!data.route_from || !data.route_to) { toast('Введите маршрут', 'error'); return; }
+      document.getElementById('rSave').disabled = true;
+      try {
+        if (editingId) {
+          await api('PUT', `/requests/${editingId}`, data);
+          toast('Сохранено', 'success');
+        } else {
+          await api('POST', '/requests', data);
+          toast('Запрос создан', 'success');
+        }
+        closeModal(); await load();
+      } catch(err) { toast(err.message, 'error'); }
+      finally { document.getElementById('rSave').disabled = false; }
+    });
+
+    document.getElementById('btnDeleteReq').addEventListener('click', async () => {
+      if (!editingId || !confirm('Удалить запрос?')) return;
+      try { await api('DELETE', `/requests/${editingId}`); closeModal(); await load(); toast('Удалено'); }
+      catch(err) { toast(err.message, 'error'); }
+    });
+
+    // ── Calculator ────────────────────────────────────────────────────────────
+    document.getElementById('calcBtn').addEventListener('click', () => {
+      const dist    = parseFloat(document.getElementById('cDist').value)       || 0;
+      const carrier = parseFloat(document.getElementById('cCarrierRate').value)|| 0;
+      const extra   = parseFloat(document.getElementById('cExtra').value)      || 0;
+      const markup  = parseFloat(document.getElementById('cMarkup').value)     || 15;
+      const discount= parseFloat(document.getElementById('cDiscount').value)   || 0;
+      const transport = document.getElementById('cTransport').value;
+
+      if (!carrier) { toast('Введите ставку перевозчика', 'error'); return; }
+
+      const cost     = carrier + extra;
+      const markupAmt= cost * markup / 100;
+      let   clientRate = cost + markupAmt;
+      if (discount) clientRate *= (1 - discount / 100);
+      clientRate = Math.round(clientRate);
+
+      const margin    = clientRate - cost;
+      const marginPct = +((margin / clientRate) * 100).toFixed(1);
+      const perKm     = dist ? Math.round(clientRate / dist) : null;
+
+      const fmt = n => n.toLocaleString('ru-RU') + ' ₽';
+
+      document.getElementById('rClientRate').textContent = fmt(clientRate);
+      document.getElementById('rMargin').textContent     = fmt(margin);
+      document.getElementById('rMarginPct').textContent  = marginPct + '%';
+      document.getElementById('rPerKm').textContent      = perKm ? perKm + ' ₽/км' : '—';
+
+      const fill = document.getElementById('marginFill');
+      fill.style.width = Math.min(marginPct, 40) * 2.5 + '%';
+      fill.className = 'margin-fill' + (marginPct >= 15 ? '' : marginPct >= 8 ? ' warn' : ' bad');
+      document.getElementById('marginComment').textContent =
+        marginPct >= 20 ? '✓ Отличная маржа' :
+        marginPct >= 12 ? '✓ Хорошая маржа' :
+        marginPct >= 8  ? '⚠ Низкая маржа, обсудите с руководителем' :
+        '✗ Маржа ниже минимума — рейс нецелесообразен';
+
+      document.getElementById('calcResult').style.display = 'grid';
+      document.getElementById('marginBarWrap').style.display = 'block';
+      document.getElementById('calcToRequest').style.display = 'inline-flex';
+    });
+
+    document.getElementById('calcToRequest').addEventListener('click', () => {
+      viewMode = 'kanban';
+      document.getElementById('calcView').style.display = 'none';
+      document.getElementById('kanbanView').style.display = 'flex';
+      document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('viewKanban').classList.add('active');
+      openModal(null);
+    });
+
+    // ── View toggle ───────────────────────────────────────────────────────────
+    document.getElementById('viewKanban').addEventListener('click', () => {
+      viewMode = 'kanban';
+      document.getElementById('kanbanView').style.display = 'flex';
+      document.getElementById('listView').style.display = 'none';
+      document.getElementById('calcView').style.display = 'none';
+      document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('viewKanban').classList.add('active');
+      renderKanban();
+    });
+    document.getElementById('viewList').addEventListener('click', () => {
+      viewMode = 'list';
+      document.getElementById('listView').style.display = 'flex';
+      document.getElementById('kanbanView').style.display = 'none';
+      document.getElementById('calcView').style.display = 'none';
+      document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('viewList').classList.add('active');
+      renderList();
+    });
+    document.getElementById('viewCalc').addEventListener('click', () => {
+      viewMode = 'calc';
+      document.getElementById('calcView').style.display = 'flex';
+      document.getElementById('kanbanView').style.display = 'none';
+      document.getElementById('listView').style.display = 'none';
+      document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('viewCalc').classList.add('active');
+    });
+
+    // ── Toolbar ───────────────────────────────────────────────────────────────
+    document.getElementById('btnNew').addEventListener('click', () => openModal(null));
+    let searchTimer;
+    document.getElementById('searchInput').addEventListener('input', () => {
+      clearTimeout(searchTimer); searchTimer = setTimeout(load, 220);
+    });
+    document.getElementById('fTransport').addEventListener('change', load);
+
+    document.addEventListener('keydown', e => {
+      if (e.target.matches('input,textarea,select')) return;
+      if (e.key === 'n' || e.key === 'т') openModal(null);
+      if (e.key === 'Escape') closeModal();
+    });
+  </script>
+</body>
+</html>

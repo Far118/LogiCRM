@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <style>html{visibility:hidden}</style>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Активности — LogiCRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+
+  <!--
+    CSS полностью сохранён из оригинала — не изменён ни один класс.
+    Это важно: Alpine работает с теми же CSS-классами, что были раньше.
+  -->
+  <style>
+    .act-list { display: flex; flex-direction: column; }
+    .act-item {
+      display: flex; align-items: flex-start; gap: .75rem;
+      padding: .85rem 1.5rem; border-bottom: 1px solid var(--divider);
+    }
+    .act-item:hover { background: var(--surface-off); }
+    .act-icon { width: 32px; height: 32px; border-radius: var(--r-full); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .act-icon svg { width: 13px; height: 13px; }
+    .act-icon.teal   { background: var(--primary-subtle); color: var(--primary); }
+    .act-icon.blue   { background: color-mix(in oklch, var(--blue) 12%, var(--surface)); color: var(--blue); }
+    .act-icon.orange { background: color-mix(in oklch, var(--orange) 12%, var(--surface)); color: var(--orange); }
+    .act-icon.red    { background: color-mix(in oklch, var(--error) 12%, var(--surface)); color: var(--error); }
+    .act-icon.green  { background: color-mix(in oklch, var(--success) 12%, var(--surface)); color: var(--success); }
+    .act-icon.gray   { background: var(--surface-off); color: var(--text-muted); }
+    .act-body { flex: 1; min-width: 0; }
+    .act-head { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: .2rem; }
+    .act-type { font-weight: 600; font-size: .88rem; }
+    .act-co   { color: var(--primary); font-size: .82rem; font-weight: 500; }
+    .act-co:hover { text-decoration: underline; }
+    .act-time { color: var(--text-faint); font-size: .75rem; }
+    .act-desc { font-size: .88rem; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+    .act-next { display: inline-flex; align-items: center; gap: .35rem; margin-top: .35rem; font-size: .78rem; color: var(--text-muted); cursor: pointer; }
+    .act-next.overdue { color: var(--error); font-weight: 500; }
+    .check-box {
+      width: 15px; height: 15px; border-radius: 3px;
+      border: 1.5px solid var(--text-faint); flex-shrink: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: all var(--t);
+    }
+    .check-box.done { background: var(--success); border-color: var(--success); }
+    .check-box.done::after { content: ''; display: block; width: 4px; height: 7px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); margin-bottom: 1px; }
+    .act-actions { display: flex; gap: .25rem; opacity: 0; transition: opacity var(--t); }
+    .act-item:hover .act-actions { opacity: 1; }
+    .day-label { padding: .5rem 1.5rem .25rem; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); font-weight: 600; background: var(--bg); position: sticky; top: 0; z-index: 1; border-bottom: 1px solid var(--divider); }
+    .day-label.danger { color: var(--error); }
+    @media (max-width: 900px) { .act-item { padding: .75rem 1rem; } .day-label { padding: .4rem 1rem .2rem; } }
+  </style>
+</head>
+<body>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <!--
+    x-data="activitiesPage" — точка входа Alpine-компонента.
+    Компонент зарегистрирован в js/pages/activities.js через Alpine.data().
+    Всё что ниже — декларативный шаблон; JS-логика вынесена в отдельный файл.
+  -->
+  <div class="main" x-data="activitiesPage">
+
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <h1 class="topbar-title">
+        Активности
+        <!-- Счётчик обновляется реактивно: не нужен getElementById + textContent -->
+        <span class="count" x-show="filtered.length > 0" x-text="`(${filtered.length})`"></span>
+      </h1>
+    </header>
+
+    <!--
+      Фильтры: x-model привязывает значения напрямую к filters.* в компоненте.
+      При изменении любого фильтра filtered/groups пересчитываются автоматически.
+      Не нужны addEventListener и ручной вызов render().
+    -->
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input
+          x-model.debounce.180ms="filters.q"
+          class="search-input"
+          placeholder="Поиск по описанию…"
+        >
+      </div>
+      <select x-model="filters.type" class="filter-select">
+        <option value="">Все типы</option>
+        <option value="call_out">Звонок исх.</option>
+        <option value="call_in">Звонок вх.</option>
+        <option value="email_out">Письмо исх.</option>
+        <option value="email_in">Письмо вх.</option>
+        <option value="meeting">Встреча</option>
+        <option value="task">Задача</option>
+        <option value="proposal">КП</option>
+        <option value="note">Заметка</option>
+      </select>
+      <select x-model="filters.done" class="filter-select">
+        <option value="">Все задачи</option>
+        <option value="open">Открытые</option>
+        <option value="done">Выполненные</option>
+        <option value="overdue">Просроченные</option>
+      </select>
+      <input x-model="filters.dateFrom" type="date" class="filter-select" title="Начало периода">
+      <input x-model="filters.dateTo"   type="date" class="filter-select" title="Конец периода">
+    </div>
+
+    <div class="content-bare" style="overflow-y:auto">
+
+      <!-- Состояние загрузки — скелетоны как в оригинале -->
+      <div x-show="loading" style="padding:3rem;text-align:center;color:var(--text-muted)">
+        <div class="skeleton" style="width:60%;margin:0 auto"></div>
+        <div class="skeleton" style="width:40%;margin:.75rem auto 0"></div>
+      </div>
+
+      <!-- Пустое состояние после загрузки -->
+      <div x-show="!loading && filtered.length === 0" class="empty-state">
+        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        <h3>Ничего не найдено</h3>
+        <p>Попробуйте изменить фильтры или зайдите в карточку компании чтобы добавить активность.</p>
+      </div>
+
+      <!--
+        Список сгруппированный по дням.
+        groups — вычисляемый геттер в компоненте, пересчитывается при
+        изменении any из filters.* или при вызове load() после действий.
+      -->
+      <template x-show="!loading" x-for="group in groups" :key="group.day">
+        <div>
+          <!-- Дневной заголовок -->
+          <div
+            class="day-label"
+            :class="group.isToday ? 'danger' : ''"
+          >
+            <span x-text="group.label"></span>
+            <span style="opacity:.5" x-text="`(${group.items.length})`"></span>
+          </div>
+
+          <!-- Список активностей за день -->
+          <div class="act-list">
+            <template x-for="a in group.items" :key="a.id">
+              <div class="act-item">
+
+                <!-- Иконка типа -->
+                <div class="act-icon" :class="iconColor(a.type)" x-html="iconSvg(a.type)"></div>
+
+                <!-- Тело активности -->
+                <div class="act-body">
+                  <div class="act-head">
+                    <span class="act-type" x-text="typeLabel(a.type)"></span>
+                    <a
+                      x-show="compName(a.company_id)"
+                      :href="compLink(a.company_id)"
+                      class="act-co"
+                      x-text="compName(a.company_id)"
+                    ></a>
+                    <span class="act-time" x-text="fmtDateTime(a.occurred_at)"></span>
+                  </div>
+
+                  <!-- Описание -->
+                  <div x-show="a.description" class="act-desc" x-text="a.description"></div>
+
+                  <!-- Итог -->
+                  <div
+                    x-show="a.outcome"
+                    style="font-size:.78rem;color:var(--text-muted);margin-top:.2rem"
+                    x-text="`Итог: ${a.outcome}`"
+                  ></div>
+
+                  <!-- Следующий шаг с чекбоксом -->
+                  <div
+                    x-show="a.next_step"
+                    class="act-next"
+                    :class="isOverdue(a) ? 'overdue' : ''"
+                    @click="toggleDone(a)"
+                  >
+                    <span class="check-box" :class="a.is_done ? 'done' : ''"></span>
+                    <span x-text="a.next_step"></span>
+                    <span
+                      x-show="a.next_step_due"
+                      x-text="`· до ${fmtDate(a.next_step_due)}${isOverdue(a) ? ' (просрочено!)' : ''}`"
+                    ></span>
+                  </div>
+                </div>
+
+                <!-- Действия -->
+                <div class="act-actions">
+                  <a
+                    :href="`/company.html?id=${a.company_id}&tab=activities`"
+                    class="icon-btn"
+                    title="Открыть в компании"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                      <polyline points="15 3 21 3 21 9"/>
+                      <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                  </a>
+                  <button
+                    class="icon-btn danger"
+                    title="Удалить"
+                    @click="remove(a.id)"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/>
+                    </svg>
+                  </button>
+                </div>
+
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+    </div><!-- /content-bare -->
+  </div><!-- /main -->
+
+  <div class="toast" id="toast"></div>
+
+  <!--
+    Единственный скрипт — импортирует Alpine + компонент.
+    Vite соберёт этот import в один бандл с хэшем.
+    В dev-режиме (`npm run dev`) Vite раздаёт файлы напрямую.
+  -->
+  <script type="module" src="/js/pages/activities.js"></script>
+</body>
+</html>
