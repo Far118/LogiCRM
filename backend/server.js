@@ -45,7 +45,8 @@ import requestsRoutes       from './routes/requests.js';
 import reportsRoutes        from './routes/reports.js';
 import importRoutes         from './routes/import.js';
 import searchRoutes         from './routes/search.js';
-import plansRoutes          from './routes/plans.js';
+import notificationsRoutes from './routes/notifications.js';
+import { runScheduler }    from './services/notifier.js';
 
 // ── Кластер ───────────────────────────────────────────────────────────────────
 //
@@ -107,6 +108,19 @@ if (cluster.isPrimary && NUM_WORKERS > 1) {
 
   // Primary не запускает HTTP — только управляет воркерами
   // (migrate.js уже отработал до запуска server.js, см. Dockerfile CMD)
+
+  // ── Планировщик push-уведомлений ─────────────────────────────────────────
+  // Запускается только в primary — один раз на весь кластер,
+  // чтобы не отправлять дубли с каждого воркера.
+  //
+  // Логика: каждый час проверяем просроченные и сегодняшние задачи.
+  // В 9:00 отправляем утренние сводки пользователям.
+  setTimeout(async () => {
+    await runScheduler().catch(err => console.error('[scheduler]', err.message));
+    setInterval(() => {
+      runScheduler().catch(err => console.error('[scheduler]', err.message));
+    }, 60 * 60 * 1000); // каждый час
+  }, 10_000); // первый запуск через 10 сек после старта
 
 } else {
   // ── Worker-процесс (или единственный процесс при NUM_WORKERS=1) ────────────
@@ -172,7 +186,8 @@ app.use('/api/requests',   requestsRoutes);
 app.use('/api/reports',    reportsRoutes);
 app.use('/api/import',     importRoutes);
 app.use('/api/search',     searchRoutes);
-app.use('/api/plans',      plansRoutes);
+app.use('/api/plans',          plansRoutes);
+app.use('/api/notifications',  notificationsRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

@@ -10,55 +10,118 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/app.css">
   <style>
-    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-    .dash-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; }
-    @media (max-width: 1100px) { .dash-grid { grid-template-columns: 1fr; } }
+    .stats-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:1rem; margin-bottom:1.5rem; }
+    .dash-grid { display:grid; grid-template-columns:2fr 1fr; gap:1rem; }
+    @media (max-width:1100px) { .dash-grid { grid-template-columns:1fr; } }
 
-    /* Plan widget */
-    .plan-row {
-      display: flex; align-items: center; gap: .65rem;
-      padding: .5rem 0;
+    /* Plan */
+    .plan-row { display:flex; align-items:center; gap:.65rem; padding:.5rem 0; }
+    .plan-row + .plan-row { border-top:1px solid var(--divider); }
+    .plan-label { font-size:.78rem; color:var(--text-muted); flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .plan-bar-wrap { width:90px; height:6px; background:var(--surface-off); border-radius:var(--r-full); overflow:hidden; flex-shrink:0; }
+    .plan-bar { height:100%; border-radius:var(--r-full); transition:width .6s cubic-bezier(.16,1,.3,1); }
+    .plan-bar.good   { background:var(--success); }
+    .plan-bar.ok     { background:var(--primary); }
+    .plan-bar.warn   { background:var(--warning); }
+    .plan-bar.behind { background:var(--error); }
+    .plan-pct { font-size:.78rem; font-weight:600; width:38px; text-align:right; flex-shrink:0; }
+    .plan-nums { font-size:.7rem; color:var(--text-faint); width:90px; text-align:right; flex-shrink:0; }
+
+    /* Tasks */
+    .task-row { display:flex; align-items:center; gap:.75rem; padding:.65rem 1rem; border-top:1px solid var(--divider); cursor:pointer; text-decoration:none; color:inherit; }
+    .task-row:hover { background:var(--surface-off); }
+    .task-check { width:16px; height:16px; border-radius:4px; border:1.5px solid var(--text-faint); flex-shrink:0; }
+    .task-row.overdue .task-check { border-color:var(--error); }
+    .task-text { flex:1; min-width:0; font-size:.9em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .task-meta { font-size:.75rem; color:var(--text-muted); margin-top:2px; display:flex; gap:.5rem; }
+    .task-meta .co { color:var(--primary); }
+    .task-row.overdue .task-due { color:var(--error); font-weight:500; }
+    .sec-lbl { padding:.4rem 1rem .2rem; font-size:.68rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-faint); font-weight:600; }
+    .sec-lbl.danger { color:var(--error); }
+
+    /* Companies */
+    .co-row { display:flex; align-items:center; gap:.75rem; padding:.65rem 1rem; border-top:1px solid var(--divider); cursor:pointer; text-decoration:none; color:inherit; }
+    .co-row:hover { background:var(--surface-off); }
+    .co-name { font-weight:500; flex:1; min-width:0; font-size:.9em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .co-meta { font-size:.75rem; color:var(--text-muted); display:flex; gap:.4rem; align-items:center; }
+
+    /* Quick actions */
+    .qa { display:flex; align-items:center; gap:.75rem; padding:.65rem 1rem; color:var(--text); font-size:.9em; text-decoration:none; }
+    .qa:hover { background:var(--surface-off); }
+    .qa svg { width:15px; height:15px; color:var(--primary); flex-shrink:0; }
+    .qa-name { flex:1; font-weight:500; }
+    .qa-hint { font-size:.72rem; color:var(--text-faint); }
+
+    /* Week activity */
+    .week-row { display:flex; align-items:center; justify-content:space-between; padding:.45rem 0; }
+    .week-row + .week-row { border-top:1px solid var(--divider); }
+
+    /* ── Мини-календарь ─────────────────────────────────── */
+    .mini-cal { padding:.75rem 1rem 1rem; }
+    .cal-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:.75rem; }
+    .cal-nav-btn { padding:.3rem .5rem; border-radius:var(--r-md); color:var(--text-muted); transition:background var(--t); line-height:1; }
+    .cal-nav-btn:hover { background:var(--surface-off); color:var(--text); }
+    .cal-title { font-size:.88rem; font-weight:600; }
+    .cal-today-btn { font-size:.72rem; color:var(--primary); padding:.2rem .5rem; border-radius:var(--r-sm); }
+    .cal-today-btn:hover { background:var(--primary-subtle); }
+    .cal-grid { display:grid; grid-template-columns:repeat(7, 1fr); gap:2px; }
+    .cal-dow { text-align:center; font-size:.65rem; font-weight:600; color:var(--text-faint); padding:.2rem 0 .4rem; text-transform:uppercase; letter-spacing:.04em; }
+    .cal-day {
+      position:relative; aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+      border-radius:var(--r-md); font-size:.8rem; cursor:default;
+      transition:background var(--t), color var(--t);
     }
-    .plan-row + .plan-row { border-top: 1px solid var(--divider); }
-    .plan-label { font-size: .78rem; color: var(--text-muted); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .plan-bar-wrap { width: 90px; height: 6px; background: var(--surface-off); border-radius: var(--r-full); overflow: hidden; flex-shrink: 0; }
-    .plan-bar { height: 100%; border-radius: var(--r-full); transition: width .6s cubic-bezier(.16,1,.3,1); }
-    .plan-bar.good   { background: var(--success); }
-    .plan-bar.ok     { background: var(--primary); }
-    .plan-bar.warn   { background: var(--warning); }
-    .plan-bar.behind { background: var(--error); }
-    .plan-pct { font-size: .78rem; font-weight: 600; width: 38px; text-align: right; flex-shrink: 0; }
-    .plan-nums { font-size: .7rem; color: var(--text-faint); width: 90px; text-align: right; flex-shrink: 0; }
-    .plan-no-plan { padding: .75rem 0; font-size: .82rem; color: var(--text-muted); text-align: center; }
-    .task-row {
-      display: flex; align-items: center; gap: .75rem;
-      padding: .65rem 1rem; border-top: 1px solid var(--divider); cursor: pointer;
+    .cal-day.current { cursor:pointer; }
+    .cal-day.current:hover { background:var(--surface-off); }
+    .cal-day.other { color:var(--text-faint); opacity:.4; }
+    .cal-day.today { background:var(--primary); color:#fff; font-weight:700; }
+    .cal-day.today:hover { background:var(--primary); filter:brightness(1.1); }
+    .cal-day.selected { background:var(--primary-subtle); color:var(--primary); font-weight:600; outline:1.5px solid var(--primary); }
+    .cal-day.selected.today { background:var(--primary); color:#fff; }
+    /* Точки с задачами */
+    .cal-dots { position:absolute; bottom:3px; left:50%; transform:translateX(-50%); display:flex; gap:2px; }
+    .cal-dot { width:4px; height:4px; border-radius:50%; }
+    .cal-dot.overdue { background:var(--error); }
+    .cal-dot.today   { background:var(--warning); }
+    .cal-dot.future  { background:var(--primary); }
+    /* Список задач на выбранный день */
+    .cal-selected-items { margin-top:.75rem; border-top:1px solid var(--divider); padding-top:.65rem; }
+    .cal-item { display:flex; align-items:flex-start; gap:.5rem; padding:.4rem 0; }
+    .cal-item + .cal-item { border-top:1px solid var(--divider); }
+    .cal-item-icon { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; }
+    .cal-item-icon.task    { background:var(--primary-subtle); color:var(--primary); }
+    .cal-item-icon.company { background:color-mix(in oklch,var(--success) 15%,var(--surface)); color:var(--success); }
+    .cal-item-label { font-size:.82rem; font-weight:500; }
+    .cal-item-sub   { font-size:.72rem; color:var(--text-muted); margin-top:1px; }
+
+    /* ── Push-уведомления ──────────────────────────────── */
+    .push-row { display:flex; align-items:center; justify-content:space-between; padding:.75rem 1rem; }
+    .push-label { font-size:.85rem; }
+    .push-status { font-size:.72rem; color:var(--text-muted); margin-top:2px; }
+    .push-toggle { position:relative; width:40px; height:22px; flex-shrink:0; }
+    .push-toggle input { opacity:0; width:0; height:0; }
+    .push-slider {
+      position:absolute; inset:0; background:var(--surface-off);
+      border-radius:var(--r-full); cursor:pointer;
+      border:1.5px solid var(--border); transition:background var(--t);
     }
-    .task-row:hover { background: var(--surface-off); }
-    .task-check { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--text-faint); flex-shrink: 0; }
-    .task-row.overdue .task-check { border-color: var(--error); }
-    .task-text { flex: 1; min-width: 0; font-size: .9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .task-meta { font-size: .75rem; color: var(--text-muted); margin-top: 2px; display: flex; gap: .5rem; }
-    .task-meta .co { color: var(--primary); }
-    .task-row.overdue .task-due { color: var(--error); font-weight: 500; }
-    .sec-lbl { padding: .4rem 1rem .2rem; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); font-weight: 600; }
-    .sec-lbl.danger { color: var(--error); }
-    .co-row { display: flex; align-items: center; gap: .75rem; padding: .65rem 1rem; border-top: 1px solid var(--divider); cursor: pointer; }
-    .co-row:hover { background: var(--surface-off); }
-    .co-name { font-weight: 500; flex: 1; min-width: 0; font-size: .9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .co-meta { font-size: .75rem; color: var(--text-muted); display: flex; gap: .4rem; align-items: center; }
-    .qa { display: flex; align-items: center; gap: .75rem; padding: .65rem 1rem; color: var(--text); font-size: .9em; }
-    .qa:hover { background: var(--surface-off); }
-    .qa svg { width: 15px; height: 15px; color: var(--primary); flex-shrink: 0; }
-    .qa-name { flex: 1; font-weight: 500; }
-    .qa-hint { font-size: .72rem; color: var(--text-faint); }
-    .week-row { display: flex; align-items: center; justify-content: space-between; padding: .45rem 0; }
-    .week-row + .week-row { border-top: 1px solid var(--divider); }
-    .ph-card { padding: 2rem 1rem; text-align: center; color: var(--text-muted); }
-    .ph-card h4 { font-size: .9em; font-weight: 600; color: var(--text); margin-bottom: .3rem; }
+    .push-slider::before {
+      content:''; position:absolute; width:16px; height:16px;
+      background:#fff; border-radius:50%;
+      left:2px; top:1px; transition:transform var(--t);
+      box-shadow:0 1px 3px rgba(0,0,0,.2);
+    }
+    input:checked + .push-slider { background:var(--primary); border-color:var(--primary); }
+    input:checked + .push-slider::before { transform:translateX(18px); }
+    .push-denied { font-size:.75rem; color:var(--error); padding:.5rem 1rem; }
   </style>
 </head>
-<body>
+
+<!--
+  x-data="dashboardPage" — Alpine-компонент из js/pages/dashboard.js.
+  Весь JS-код вынесен в компонент; здесь только декларативный шаблон.
+-->
+<body x-data="dashboardPage" x-init="init()">
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
   <aside class="sidebar" id="sidebar"></aside>
 
@@ -71,217 +134,470 @@
       </button>
       <h1 class="topbar-title">Дашборд</h1>
       <a href="/companies.html?new=1" class="btn btn-ghost">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
         Новая компания
       </a>
     </header>
 
     <main class="content">
+
+      <!-- Приветствие -->
       <div style="margin-bottom:1.5rem">
-        <h2 id="greetTitle" style="font-size:clamp(1.25rem,1.1rem+.75vw,1.75rem);font-weight:700;letter-spacing:-.01em">Привет!</h2>
-        <p id="greetSub" style="color:var(--text-muted);margin-top:.25rem;font-size:.9em">Загружаем…</p>
+        <h2 x-text="greetTitle" style="font-size:clamp(1.25rem,1.1rem+.75vw,1.75rem);font-weight:700;letter-spacing:-.01em">Привет!</h2>
+        <p x-html="greetSub" style="color:var(--text-muted);margin-top:.25rem;font-size:.9em">Загружаем…</p>
       </div>
 
+      <!-- Счётчики -->
       <div class="stats-row">
-        <div class="stat-card"><div class="stat-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div><div class="stat-num" id="sOverdue">—</div><div class="stat-label">Просрочено</div></div></div>
-        <div class="stat-card"><div class="stat-icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><div><div class="stat-num" id="sToday">—</div><div class="stat-label">На сегодня</div></div></div>
-        <div class="stat-card"><div class="stat-icon teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div><div><div class="stat-num" id="sWeek">—</div><div class="stat-label">На неделю</div></div></div>
-        <div class="stat-card"><div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1"/><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg></div><div><div class="stat-num" id="sCompanies">—</div><div class="stat-label" id="sCompLabel">Компаний</div></div></div>
+        <div class="stat-card">
+          <div class="stat-icon red">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <div>
+            <div class="stat-num" x-text="stats.overdue">—</div>
+            <div class="stat-label">Просрочено</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </div>
+          <div>
+            <div class="stat-num" x-text="stats.today">—</div>
+            <div class="stat-label">На сегодня</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon teal">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 11 12 14 22 4"/>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+            </svg>
+          </div>
+          <div>
+            <div class="stat-num" x-text="stats.week">—</div>
+            <div class="stat-label">На неделю</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1"/>
+              <path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/>
+            </svg>
+          </div>
+          <div>
+            <div class="stat-num" x-text="stats.companies">—</div>
+            <div class="stat-label" x-text="compLabel">Компаний</div>
+          </div>
+        </div>
       </div>
 
       <div class="dash-grid">
+        <!-- ── Левая колонка ── -->
         <div>
+
+          <!-- Мои задачи -->
           <div class="card">
-            <div class="card-head">
-              <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Мои задачи</div>
-              <a href="/activities.html" class="card-link">Все →</a>
-            </div>
-            <div class="card-body" id="tasksBody"><div style="padding:.75rem 1rem"><div class="skeleton" style="width:65%"></div><div class="skeleton" style="width:80%;margin-top:.5rem"></div></div></div>
-          </div>
-          <div class="card">
-            <div class="card-head"><div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Воронка продаж</div></div>
-            <div class="card-body"><div class="ph-card"><h4>Реализуется в Спринте 2</h4><p style="font-size:.85em;margin-top:.25rem">Канбан по стадиям сделок.</p></div></div>
-          </div>
-        </div>
-        <div>
-          <div class="card">
-            <div class="card-head">
-              <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1"/><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>Свежие компании</div>
-              <a href="/companies.html" class="card-link">Все →</a>
-            </div>
-            <div class="card-body" id="freshBody"><div style="padding:.75rem 1rem"><div class="skeleton" style="width:70%"></div></div></div>
-          </div>
-          <div class="card">
-            <div class="card-head"><div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>За последние 7 дней</div></div>
-            <div class="card-body padded" id="weekBody"><div class="skeleton" style="width:60%"></div></div>
-          </div>
-          <div class="card" id="planCard">
             <div class="card-head">
               <div class="card-title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                План на месяц
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 11 12 14 22 4"/>
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                </svg>
+                Мои задачи
               </div>
-              <span id="planMonth" style="font-size:.75rem;color:var(--text-muted)"></span>
+              <a href="/activities.html" class="card-link">Все →</a>
             </div>
-            <div class="card-body padded" id="planBody">
-              <div class="skeleton" style="width:80%;height:8px;border-radius:4px"></div>
-              <div class="skeleton" style="width:65%;height:8px;border-radius:4px;margin-top:.5rem"></div>
+            <div class="card-body">
+
+              <!-- Skeleton при загрузке -->
+              <div x-show="loading" style="padding:.75rem 1rem">
+                <div class="skeleton" style="width:65%"></div>
+                <div class="skeleton" style="width:80%;margin-top:.5rem"></div>
+              </div>
+
+              <!-- Пусто -->
+              <div x-show="!loading && !overdueTasks.length && !todayTasks.length && !weekTasks.length"
+                class="empty-mini">✓ Нет задач на ближайшую неделю
+              </div>
+
+              <!-- Просроченные -->
+              <template x-if="overdueTasks.length">
+                <div>
+                  <div class="sec-lbl danger">
+                    Просрочено · <span x-text="overdueTasks.length"></span>
+                  </div>
+                  <template x-for="a in overdueTasks.slice(0, 5)" :key="a.id">
+                    <a :href="taskUrl(a)" class="task-row overdue">
+                      <div class="task-check"></div>
+                      <div style="flex:1;min-width:0">
+                        <div class="task-text" x-text="a.next_step"></div>
+                        <div class="task-meta">
+                          <span class="co" x-show="taskCompany(a)" x-text="taskCompany(a)?.name"></span>
+                          <span class="task-due" x-text="fmtDate(a.next_step_due)"></span>
+                        </div>
+                      </div>
+                    </a>
+                  </template>
+                </div>
+              </template>
+
+              <!-- Сегодня -->
+              <template x-if="todayTasks.length">
+                <div>
+                  <div class="sec-lbl">Сегодня · <span x-text="todayTasks.length"></span></div>
+                  <template x-for="a in todayTasks.slice(0, 5)" :key="a.id">
+                    <a :href="taskUrl(a)" class="task-row">
+                      <div class="task-check"></div>
+                      <div style="flex:1;min-width:0">
+                        <div class="task-text" x-text="a.next_step"></div>
+                        <div class="task-meta">
+                          <span class="co" x-show="taskCompany(a)" x-text="taskCompany(a)?.name"></span>
+                          <span x-text="fmtDate(a.next_step_due)"></span>
+                        </div>
+                      </div>
+                    </a>
+                  </template>
+                </div>
+              </template>
+
+              <!-- Эта неделя -->
+              <template x-if="weekTasks.length">
+                <div>
+                  <div class="sec-lbl">Эта неделя · <span x-text="weekTasks.length"></span></div>
+                  <template x-for="a in weekTasks.slice(0, 5)" :key="a.id">
+                    <a :href="taskUrl(a)" class="task-row">
+                      <div class="task-check"></div>
+                      <div style="flex:1;min-width:0">
+                        <div class="task-text" x-text="a.next_step"></div>
+                        <div class="task-meta">
+                          <span class="co" x-show="taskCompany(a)" x-text="taskCompany(a)?.name"></span>
+                          <span x-text="fmtDate(a.next_step_due)"></span>
+                        </div>
+                      </div>
+                    </a>
+                  </template>
+                </div>
+              </template>
+
             </div>
           </div>
 
+          <!-- Воронка (заглушка) -->
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+                Воронка продаж
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="ph-card">
+                <h4>Реализуется в Спринте 2</h4>
+                <p style="font-size:.85em;margin-top:.25rem">Канбан по стадиям сделок.</p>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /левая колонка -->
+
+        <!-- ── Правая колонка ── -->
+        <div>
+
+          <!-- ── МИНИ-КАЛЕНДАРЬ ── -->
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                Календарь
+              </div>
+              <button class="cal-today-btn" @click="calGoToday()">Сегодня</button>
+            </div>
+
+            <div class="mini-cal">
+              <!-- Навигация по месяцам -->
+              <div class="cal-nav">
+                <button class="cal-nav-btn" @click="calPrev()" title="Предыдущий месяц">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="15 18 9 12 15 6"/>
+                  </svg>
+                </button>
+                <span class="cal-title" x-text="calTitle"></span>
+                <button class="cal-nav-btn" @click="calNext()" title="Следующий месяц">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                </button>
+              </div>
+
+              <!-- Сетка: дни недели -->
+              <div class="cal-grid">
+                <template x-for="d in calDow" :key="d">
+                  <div class="cal-dow" x-text="d"></div>
+                </template>
+
+                <!-- Ячейки дней -->
+                <template x-for="(day, i) in calDays" :key="i">
+                  <div
+                    class="cal-day"
+                    :class="{
+                      current:  day.current,
+                      other:    !day.current,
+                      today:    day.isToday,
+                      selected: day.isSelected,
+                    }"
+                    @click="calSelectDay(day)"
+                    :title="day.total ? `${day.total} задач` : ''"
+                  >
+                    <span x-text="day.day"></span>
+                    <!-- Точки: цвет зависит от типа (просрочено/сегодня/будущее) -->
+                    <div class="cal-dots" x-show="day.current && day.total">
+                      <span class="cal-dot"
+                        :class="day.hasOverdue ? 'overdue' : day.hasToday ? 'today' : 'future'">
+                      </span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Список задач на выбранный день -->
+              <div class="cal-selected-items" x-show="calSelected && calSelectedItems.length">
+                <div style="font-size:.72rem;font-weight:600;color:var(--text-muted);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em">
+                  <span x-text="fmtDate(calSelected)"></span>
+                </div>
+                <template x-for="(item, i) in calSelectedItems" :key="i">
+                  <a :href="item.url" class="cal-item">
+                    <div class="cal-item-icon" :class="item.type">
+                      <!-- Задача -->
+                      <svg x-show="item.type === 'task'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polyline points="9 11 12 14 22 4"/>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                      </svg>
+                      <!-- Компания -->
+                      <svg x-show="item.type === 'company'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1"/>
+                        <path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="cal-item-label" x-text="item.label"></div>
+                      <div class="cal-item-sub" x-show="item.sub" x-text="item.sub"></div>
+                    </div>
+                  </a>
+                </template>
+              </div>
+
+              <!-- Легенда -->
+              <div style="margin-top:.75rem;padding-top:.6rem;border-top:1px solid var(--divider);display:flex;gap:.75rem;font-size:.68rem;color:var(--text-faint)">
+                <span style="display:flex;align-items:center;gap:3px">
+                  <span style="width:6px;height:6px;border-radius:50%;background:var(--error);flex-shrink:0"></span> Просрочено
+                </span>
+                <span style="display:flex;align-items:center;gap:3px">
+                  <span style="width:6px;height:6px;border-radius:50%;background:var(--warning);flex-shrink:0"></span> Сегодня
+                </span>
+                <span style="display:flex;align-items:center;gap:3px">
+                  <span style="width:6px;height:6px;border-radius:50%;background:var(--primary);flex-shrink:0"></span> Планы
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Свежие компании -->
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1"/>
+                  <path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/>
+                </svg>
+                Свежие компании
+              </div>
+              <a href="/companies.html" class="card-link">Все →</a>
+            </div>
+            <div class="card-body">
+              <div x-show="loading" style="padding:.75rem 1rem">
+                <div class="skeleton" style="width:70%"></div>
+              </div>
+              <div x-show="!loading && !freshCompanies.length" class="empty-mini">
+                <a href="/companies.html?new=1" class="btn btn-primary btn-sm">Создать первую</a>
+              </div>
+              <template x-for="c in freshCompanies" :key="c.id">
+                <a :href="`/company.html?id=${c.id}`" class="co-row">
+                  <div style="flex:1;min-width:0">
+                    <div class="co-name" x-text="c.name"></div>
+                    <div class="co-meta">
+                      <span class="badge" :class="`badge-${segColor(c.segment)}`">
+                        <span class="badge-dot"></span>
+                        <span x-text="segLabel(c.segment)"></span>
+                      </span>
+                      <span>· <span x-text="fmtDate(c.created_at)"></span></span>
+                    </div>
+                  </div>
+                </a>
+              </template>
+            </div>
+          </div>
+
+          <!-- Активность за 7 дней -->
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+                За последние 7 дней
+              </div>
+            </div>
+            <div class="card-body padded">
+              <div x-show="!weekTotal" style="color:var(--text-muted);font-size:.88em">
+                Активностей за неделю пока нет.
+              </div>
+              <template x-if="weekActivity.calls">
+                <div class="week-row">
+                  <span>📞 Звонки</span>
+                  <span class="badge badge-teal"><span class="badge-dot"></span><span x-text="weekActivity.calls"></span></span>
+                </div>
+              </template>
+              <template x-if="weekActivity.emails">
+                <div class="week-row">
+                  <span>✉️ Письма</span>
+                  <span class="badge badge-blue"><span class="badge-dot"></span><span x-text="weekActivity.emails"></span></span>
+                </div>
+              </template>
+              <template x-if="weekActivity.meetings">
+                <div class="week-row">
+                  <span>🤝 Встречи</span>
+                  <span class="badge badge-orange"><span class="badge-dot"></span><span x-text="weekActivity.meetings"></span></span>
+                </div>
+              </template>
+              <template x-if="weekActivity.proposals">
+                <div class="week-row">
+                  <span>📄 КП</span>
+                  <span class="badge badge-green"><span class="badge-dot"></span><span x-text="weekActivity.proposals"></span></span>
+                </div>
+              </template>
+              <div x-show="weekTotal" style="margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--divider);display:flex;justify-content:space-between;font-size:.8rem;color:var(--text-muted)">
+                <span>Всего касаний</span>
+                <strong style="color:var(--text)" x-text="weekTotal"></strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- План на месяц -->
+          <div class="card">
+            <div class="card-head">
+              <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+                План на месяц
+              </div>
+              <span style="font-size:.75rem;color:var(--text-muted)" x-text="planMonth"></span>
+            </div>
+            <div class="card-body padded">
+              <!-- Нет плана -->
+              <div x-show="!planData?.plan" class="plan-no-plan" style="padding:.75rem 0;font-size:.82rem;color:var(--text-muted);text-align:center">
+                <a x-show="isHead" href="/plans.html" style="color:var(--primary)">Установить планы для команды →</a>
+                <span x-show="!isHead">Руководитель ещё не установил план на этот месяц</span>
+              </div>
+              <!-- Строки плана -->
+              <template x-for="r in planRows" :key="r.label">
+                <div class="plan-row">
+                  <div class="plan-label" x-text="r.label"></div>
+                  <div class="plan-nums" x-text="r.nums"></div>
+                  <div class="plan-bar-wrap">
+                    <div class="plan-bar" :class="r.barClass" :style="`width:${r.p}%`"></div>
+                  </div>
+                  <div class="plan-pct" :style="`color:${r.color}`" x-text="r.p + '%'"></div>
+                </div>
+              </template>
+              <!-- Прогресс месяца -->
+              <div x-show="planDaysInfo" style="margin-top:.75rem;padding-top:.65rem;border-top:1px solid var(--divider);font-size:.7rem;color:var(--text-faint)">
+                Прошло <span x-text="planDaysInfo?.passed"></span> из <span x-text="planDaysInfo?.total"></span>
+                дней (<span x-text="planDaysInfo?.pct"></span>%)
+              </div>
+            </div>
+          </div>
+
+          <!-- ── PUSH-УВЕДОМЛЕНИЯ ── -->
+          <div class="card" x-show="pushSupported">
+            <div class="card-head">
+              <div class="card-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                Уведомления
+              </div>
+            </div>
+            <!-- Отказано в доступе -->
+            <div class="push-denied" x-show="pushPermission === 'denied'">
+              Уведомления заблокированы в браузере. Разрешите в настройках сайта (🔒 в адресной строке).
+            </div>
+            <!-- Переключатель -->
+            <div class="push-row" x-show="pushPermission !== 'denied'">
+              <div>
+                <div class="push-label">Push-уведомления о задачах</div>
+                <div class="push-status" x-text="pushSubscribed ? 'Включены · уведомления приходят в 9:00' : 'Выключены'"></div>
+              </div>
+              <label class="push-toggle" :class="pushLoading ? 'opacity-50' : ''">
+                <input type="checkbox" :checked="pushSubscribed" @change="togglePush()" :disabled="pushLoading">
+                <span class="push-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Быстрые действия -->
           <div class="card">
             <div class="card-head"><div class="card-title">Быстрые действия</div></div>
             <div class="card-body">
-              <a href="/companies.html?new=1" class="qa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span class="qa-name">Новая компания</span><span class="qa-hint">N</span></a>
-              <a href="/companies.html" class="qa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span class="qa-name">Найти компанию</span><span class="qa-hint">/</span></a>
-              <a href="/deals.html?new=1" class="qa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span class="qa-name">Новая сделка</span><span class="qa-hint">D</span></a>
+              <a href="/companies.html?new=1" class="qa">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                <span class="qa-name">Новая компания</span>
+                <span class="qa-hint">N</span>
+              </a>
+              <a href="/companies.html" class="qa">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <span class="qa-name">Найти компанию</span>
+                <span class="qa-hint">/</span>
+              </a>
+              <a href="/deals.html?new=1" class="qa">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                </svg>
+                <span class="qa-name">Новая сделка</span>
+                <span class="qa-hint">D</span>
+              </a>
             </div>
           </div>
-        </div>
+
+        </div><!-- /правая колонка -->
       </div>
+
     </main>
   </div>
 
   <div class="toast" id="toast"></div>
 
-  <script type="module">
-    import { initUI, esc, fmtDate, todayStr } from '/js/ui.js';
-    import { getCompanies, SEGMENT_LABELS, SEGMENT_COLORS } from '/js/companies.js';
-    import { getMyActivities } from '/js/activities.js';
-    import { dbGetAll } from '/js/db.js';
-    import { can, ROLES } from '/js/auth.js';
-
-    const session = await initUI({ active: 'dashboard' });
-    if (!session) throw new Error('no session');
-
-    async function loadMyPlan() {
-      try {
-        const now = new Date();
-        const res = await fetch(`/api/plans/my?year=${now.getFullYear()}&month=${now.getMonth()+1}`, {credentials:'include'});
-        return res.ok ? await res.json() : null;
-      } catch { return null; }
-    }
-
-    const h = new Date().getHours();
-    const g = h<6?'Доброй ночи':h<12?'Доброе утро':h<17?'Добрый день':'Добрый вечер';
-    document.getElementById('greetTitle').textContent = `${g}, ${session.first_name||session.email.split('@')[0]}!`;
-
-    document.addEventListener('keydown', e => {
-      if (e.target.matches('input,textarea,select')) return;
-      if (e.key==='n'||e.key==='т') location.href='/companies.html?new=1';
-      if (e.key==='/') { e.preventDefault(); location.href='/companies.html'; }
-      if (e.key==='d'||e.key==='в') location.href='/deals.html?new=1';
-    });
-
-    const [activities, companies, planData] = await Promise.all([getMyActivities(), getCompanies(), loadMyPlan()]);
-    const compById = Object.fromEntries(companies.map(c=>[c.id,c]));
-    const today = todayStr();
-    const weekEnd = (()=>{ const d=new Date(); d.setDate(d.getDate()+7); return d.toISOString().split('T')[0]; })();
-    const weekAgo = (()=>{ const d=new Date(); d.setDate(d.getDate()-7); return d.toISOString(); })();
-
-    const tasks    = activities.filter(a=>a.next_step&&a.next_step_due&&!a.is_done);
-    const overdue  = tasks.filter(a=>a.next_step_due<today).sort((a,b)=>a.next_step_due.localeCompare(b.next_step_due));
-    const todayT   = tasks.filter(a=>a.next_step_due===today);
-    const weekT    = tasks.filter(a=>a.next_step_due>today&&a.next_step_due<=weekEnd).sort((a,b)=>a.next_step_due.localeCompare(b.next_step_due));
-
-    document.getElementById('sOverdue').textContent   = overdue.length;
-    document.getElementById('sToday').textContent     = todayT.length;
-    document.getElementById('sWeek').textContent      = weekT.length;
-    document.getElementById('sCompanies').textContent = companies.length;
-    document.getElementById('sCompLabel').textContent = can([ROLES.MANAGER]) ? 'Моих компаний' : 'Всего компаний';
-
-    // ── Виджет плана
-    renderPlan(planData);
-
-    function renderPlan(data) {
-      const now = new Date();
-      const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
-      document.getElementById('planMonth').textContent = MONTHS[now.getMonth()] + ' ' + now.getFullYear();
-
-      if (!data || !data.plan) {
-        const isHead = can([ROLES.ADMIN, ROLES.HEAD]);
-        document.getElementById('planBody').innerHTML =
-          '<div class="plan-no-plan">' +
-          (isHead
-            ? '<a href="/plans.html" style="color:var(--primary)">Установить планы для команды →</a>'
-            : 'Руководитель ещё не установил план на этот месяц') +
-          '</div>';
-        return;
-      }
-
-      const { plan, fact, progress } = data;
-      const fmtRub = n => {
-        n = Number(n||0);
-        if (n >= 1000000) return (n/1000000).toFixed(1)+' млн';
-        if (n >= 1000)    return (n/1000).toFixed(0)+' тыс';
-        return String(n);
-      };
-
-      const daysTotal  = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
-      const daysPassed = now.getDate();
-      const monthPct   = Math.round(daysPassed / daysTotal * 100);
-
-      const rows = [
-        { label:'💰 Выручка',      pct:progress.revenue,
-          nums:fmtRub(fact.revenue)+' / '+fmtRub(plan.target_revenue)+' ₽' },
-        { label:'🏆 Сделок',       pct:progress.deals_won,
-          nums:fact.deals_won+' / '+plan.target_deals_won },
-        { label:'📋 Активностей',  pct:progress.activities,
-          nums:fact.activities+' / '+plan.target_activities },
-        { label:'📞 Звонков',      pct:progress.calls,
-          nums:fact.calls+' / '+plan.target_calls },
-        { label:'🤝 Встреч',       pct:progress.meetings,
-          nums:fact.meetings+' / '+plan.target_meetings },
-        { label:'📄 КП',           pct:progress.proposals,
-          nums:fact.proposals+' / '+plan.target_proposals },
-        { label:'🏢 Компаний',     pct:progress.new_companies,
-          nums:fact.new_companies+' / '+plan.target_new_companies },
-      ].filter(r => r.pct !== null);
-
-      const html = rows.map(function(r) {
-        const p = r.pct || 0;
-        const barClass = p >= 100 ? 'good' : p >= monthPct ? 'ok' : p >= monthPct * 0.7 ? 'warn' : 'behind';
-        const pctColor = p >= 100 ? 'var(--success)' : p >= monthPct ? 'var(--primary)' : p >= monthPct * 0.7 ? 'var(--warning)' : 'var(--error)';
-        return '<div class="plan-row">' +
-          '<div class="plan-label">' + r.label + '</div>' +
-          '<div class="plan-nums">' + r.nums + '</div>' +
-          '<div class="plan-bar-wrap"><div class="plan-bar ' + barClass + '" style="width:' + Math.min(p,100) + '%"></div></div>' +
-          '<div class="plan-pct" style="color:' + pctColor + '">' + p + '%</div>' +
-          '</div>';
-      }).join('') +
-        '<div style="margin-top:.75rem;padding-top:.65rem;border-top:1px solid var(--divider);font-size:.7rem;color:var(--text-faint)">' +
-        'Прошло ' + daysPassed + ' из ' + daysTotal + ' дней (' + monthPct + '%)' +
-        '</div>';
-
-      document.getElementById('planBody').innerHTML = html;
-    }
-
-    const parts=[];
-    if (overdue.length) parts.push(`<strong style="color:var(--error)">${overdue.length} просрочено</strong>`);
-    if (todayT.length) parts.push(`${todayT.length} на сегодня`);
-    if (!parts.length) parts.push('всё под контролем');
-    document.getElementById('greetSub').innerHTML = parts.join(' · ');
-
-    const tRow=a=>{const c=compById[a.company_id];const ov=a.next_step_due<today?'overdue':'';return`<a href="${c?'/company.html?id='+c.id:'/activities.html'}" class="task-row ${ov}"><div class="task-check"></div><div style="flex:1;min-width:0"><div class="task-text">${esc(a.next_step)}</div><div class="task-meta">${c?`<span class="co">${esc(c.name)}</span>`:''}<span class="task-due">${fmtDate(a.next_step_due)}</span></div></div></a>`;};
-    let tHtml='';
-    if(overdue.length){tHtml+=`<div class="sec-lbl danger">Просрочено · ${overdue.length}</div>`;tHtml+=overdue.slice(0,5).map(tRow).join('');}
-    if(todayT.length){tHtml+=`<div class="sec-lbl">Сегодня · ${todayT.length}</div>`;tHtml+=todayT.slice(0,5).map(tRow).join('');}
-    if(weekT.length){tHtml+=`<div class="sec-lbl">Эта неделя · ${weekT.length}</div>`;tHtml+=weekT.slice(0,5).map(tRow).join('');}
-    if(!tHtml)tHtml=`<div class="empty-mini">✓ Нет задач на ближайшую неделю</div>`;
-    document.getElementById('tasksBody').innerHTML=tHtml;
-
-    const fresh=[...companies].sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||'')).slice(0,5);
-    document.getElementById('freshBody').innerHTML = !fresh.length
-      ? `<div class="empty-mini"><a href="/companies.html?new=1" class="btn btn-primary btn-sm">Создать первую</a></div>`
-      : fresh.map(c=>`<a href="/company.html?id=${c.id}" class="co-row"><div style="flex:1;min-width:0"><div class="co-name">${esc(c.name)}</div><div class="co-meta"><span class="badge badge-${SEGMENT_COLORS[c.segment]||'gray'}"><span class="badge-dot"></span>${SEGMENT_LABELS[c.segment]||c.segment}</span><span>· ${fmtDate(c.created_at)}</span></div></div></a>`).join('');
-
-    const myWeek=activities.filter(a=>a.occurred_at&&a.occurred_at>=weekAgo);
-    const cnt={calls:myWeek.filter(a=>['call_out','call_in'].includes(a.type)).length,emails:myWeek.filter(a=>['email_out','email_in'].includes(a.type)).length,meetings:myWeek.filter(a=>a.type==='meeting').length,proposals:myWeek.filter(a=>a.type==='proposal').length};
-    const total=Object.values(cnt).reduce((s,v)=>s+v,0);
-    const row=(l,n,col)=>n?`<div class="week-row"><span>${l}</span><span class="badge badge-${col}"><span class="badge-dot"></span>${n}</span></div>`:'';
-    document.getElementById('weekBody').innerHTML = !total
-      ? `<div style="color:var(--text-muted);font-size:.88em">Активностей за неделю пока нет.</div>`
-      : row('📞 Звонки',cnt.calls,'teal')+row('✉️ Письма',cnt.emails,'blue')+row('🤝 Встречи',cnt.meetings,'orange')+row('📄 КП',cnt.proposals,'green')+`<div style="margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--divider);display:flex;justify-content:space-between;font-size:.8rem;color:var(--text-muted)"><span>Всего касаний</span><strong style="color:var(--text)">${total}</strong></div>`;
-  </script>
+  <script type="module" src="/js/pages/dashboard.js"></script>
 </body>
 </html>
