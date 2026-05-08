@@ -45,8 +45,9 @@ import requestsRoutes       from './routes/requests.js';
 import reportsRoutes        from './routes/reports.js';
 import importRoutes         from './routes/import.js';
 import searchRoutes         from './routes/search.js';
-import notificationsRoutes from './routes/notifications.js';
-import { runScheduler }    from './services/notifier.js';
+import plansRoutes          from './routes/plans.js';
+import notificationsRoutes  from './routes/notifications.js';
+import { runScheduler }     from './services/notifier.js';
 
 // ── Кластер ───────────────────────────────────────────────────────────────────
 //
