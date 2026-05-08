@@ -164,8 +164,14 @@ function buildSidebar(session, activeId) {
 }
 
 function escHtml(s) {
+  // Аудит 6.1: добавлено экранирование кавычек — защита от XSS в атрибутах.
+  // Без " → &quot; и ' → &#39; вставка в href="..." или value="..." небезопасна.
   return String(s ?? '')
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // ── Тема ─────────────────────────────────────────────────────────────────────

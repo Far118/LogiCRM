@@ -2,18 +2,14 @@
  * middleware/auth.js
  * JWT из httpOnly cookie → req.user = { id, email, role, first_name, last_name }
  *
- * Экспортирует:
- *   authenticate  — обязательная авторизация (401 если нет токена)
- *   requireRole   — проверка роли после authenticate
- *   optionalAuth  — подставляет req.user если токен есть, иначе null
+ * Изменения относительно оригинала:
+ *   • jwt.verify теперь явно указывает algorithms: ['HS256']
+ *     (фиксация алгоритма — защита от algorithm-confusion атак)
  */
 
 import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 
-/**
- * Подписать токен для пользователя.
- */
 export function signToken(user) {
   return jwt.sign(
     {
@@ -24,25 +20,22 @@ export function signToken(user) {
       last_name:  user.last_name,
     },
     config.jwt.secret,
-    { expiresIn: config.jwt.expiresIn }
+    {
+      expiresIn:  config.jwt.expiresIn,
+      algorithm: 'HS256',   // явно фиксируем алгоритм при подписи
+    }
   );
 }
 
-/**
- * Поставить httpOnly cookie с JWT.
- */
 export function setCookie(res, token) {
   res.cookie(config.jwt.cookieName, token, {
-    httpOnly:  true,
-    secure:    config.isProd,       // только HTTPS в production
-    sameSite:  'strict',
-    maxAge:    8 * 60 * 60 * 1000, // 8 часов
+    httpOnly: true,
+    secure:   config.isProd,
+    sameSite: 'strict',
+    maxAge:   8 * 60 * 60 * 1000,
   });
 }
 
-/**
- * Удалить cookie (logout).
- */
 export function clearCookie(res) {
   res.clearCookie(config.jwt.cookieName, {
     httpOnly: true,
@@ -51,12 +44,7 @@ export function clearCookie(res) {
   });
 }
 
-/**
- * Middleware: проверяет JWT из cookie или Authorization: Bearer.
- * При ошибке → 401 JSON.
- */
 export function authenticate(req, res, next) {
-  // Сначала cookie, потом Bearer
   const token =
     req.cookies?.[config.jwt.cookieName] ||
     req.headers.authorization?.replace('Bearer ', '');
@@ -66,7 +54,8 @@ export function authenticate(req, res, next) {
   }
 
   try {
-    req.user = jwt.verify(token, config.jwt.secret);
+    // algorithms: ['HS256'] — фиксируем явно, защита от none/RS256 подмены
+    req.user = jwt.verify(token, config.jwt.secret, { algorithms: ['HS256'] });
     next();
   } catch (err) {
     clearCookie(res);
@@ -77,11 +66,6 @@ export function authenticate(req, res, next) {
   }
 }
 
-/**
- * Middleware: проверяет, что req.user.role входит в список разрешённых.
- * Использовать ПОСЛЕ authenticate.
- * Пример: router.delete('/:id', authenticate, requireRole('admin','head'), handler)
- */
 export function requireRole(...roles) {
   return (req, res, next) => {
     if (!roles.includes(req.user?.role)) {
@@ -91,21 +75,14 @@ export function requireRole(...roles) {
   };
 }
 
-/**
- * Middleware: подставляет req.user если токен есть, иначе req.user = null.
- * Не возвращает ошибку при отсутствии токена.
- */
 export function optionalAuth(req, res, next) {
   const token =
     req.cookies?.[config.jwt.cookieName] ||
     req.headers.authorization?.replace('Bearer ', '');
 
-  if (!token) {
-    req.user = null;
-    return next();
-  }
+  if (!token) { req.user = null; return next(); }
   try {
-    req.user = jwt.verify(token, config.jwt.secret);
+    req.user = jwt.verify(token, config.jwt.secret, { algorithms: ['HS256'] });
   } catch {
     req.user = null;
   }

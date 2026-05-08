@@ -1,23 +1,36 @@
-﻿# Зависимости
+# Зависимости
 node_modules/
 frontend/node_modules/
 
 # Сборка Vite
 frontend/dist/
 
-# Переменные окружения — никогда не коммитим
+# Переменные окружения — НИКОГДА не коммитим
+# Аудит 3.2: покрываем все варианты расположения
 .env
 .env.*
 !.env.example
 !scripts/.env.backup.example
+backend/.env
+**/.env
+**/.env.*
+!**/.env.example
 
-# Бэкапы и логи
+# Бэкапы
 *.sql.gz
 backups/
-*.log
 
-# OS и IDE
+# Логи
+*.log
+logs/
+
+# SSL-сертификаты
+nginx/ssl/
+
+# OS
 .DS_Store
 Thumbs.db
+
+# IDE
 .vscode/
 .idea/

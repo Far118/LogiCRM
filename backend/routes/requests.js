@@ -25,6 +25,15 @@ import { validate }                  from '../middleware/validate.js';
 const router = Router();
 router.use(authenticate);
 
+// ── RBAC ─────────────────────────────────────────────────────────────────────
+// Исправление IDOR (аудит 2.3): GET /:id и PATCH /:id/status теперь
+// проверяют права через canModify.
+
+function canModify(request, user) {
+  if (['admin', 'head'].includes(user.role)) return true;
+  return user.role === 'manager' && request.owner_id === user.id;
+}
+
 // ── Справочник статусов (именованный экспорт — используется фронтендом) ───────
 
 export const STATUSES = ['new', 'calculating', 'quoted', 'won', 'lost', 'cancelled'];
@@ -309,6 +318,7 @@ router.get('/:id', async (req, res) => {
       .first();
 
     if (!row) return res.status(404).json({ error: 'Запрос не найден' });
+    if (!canModify(row, req.user)) return res.status(403).json({ error: 'Нет прав' });
     res.json(row);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -342,9 +352,9 @@ router.post('/', validate(CreateRequestSchema), async (req, res) => {
 
 router.put('/:id', validate(UpdateRequestSchema), async (req, res) => {
   try {
-    // Загружаем существующую запись для мержа
     const existing = await knex('requests').where({ id: req.params.id }).first();
     if (!existing) return res.status(404).json({ error: 'Запрос не найден' });
+    if (!canModify(existing, req.user)) return res.status(403).json({ error: 'Нет прав' });
 
     // Мерж: поля из req.body перекрывают existing, но только те что пришли.
     // UpdateRequestSchema без дефолтов гарантирует, что отсутствующие поля
@@ -375,21 +385,20 @@ router.patch('/:id/status', async (req, res) => {
   try {
     const { status, loss_reason } = req.body;
 
-    // Проверка статуса в обработчике — сохраняем точное сообщение оригинала
     if (!STATUSES.includes(status)) {
       return res.status(400).json({ error: 'Некорректный статус' });
     }
 
+    // IDOR-фикс: проверяем права до обновления
+    const existing = await knex('requests').where({ id: req.params.id }).first();
+    if (!existing) return res.status(404).json({ error: 'Запрос не найден' });
+    if (!canModify(existing, req.user)) return res.status(403).json({ error: 'Нет прав' });
+
     const [updated] = await knex('requests')
       .where({ id: req.params.id })
-      .update({
-        status,
-        loss_reason: loss_reason || '',
-      })
+      .update({ status, loss_reason: loss_reason || '' })
       .returning('*');
 
-    // .first() не используем — если запись не найдена, Knex вернёт []
-    if (!updated) return res.status(404).json({ error: 'Запрос не найден' });
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });

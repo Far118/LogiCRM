@@ -1,10 +1,11 @@
 /**
- * routes/auth.js — авторизация и управление сессией
+ * routes/auth.js
  *
- * POST /api/auth/login    — вход, устанавливает httpOnly cookie
- * POST /api/auth/logout   — выход, очищает cookie
- * GET  /api/auth/me       — текущий пользователь (для восстановления сессии)
- * POST /api/auth/password — смена пароля текущим пользователем
+ * Исправления (аудит):
+ *   1.1  ADMIN_PASSWORD — require_env уже в config.js (не здесь)
+ *   1.2  rate-limit теперь подключается в server.js на /api/auth/password тоже
+ *   2.9  is_active=false → 401 (не 403) — убирает user enumeration
+ *   2.10 Политика паролей усилена: минимум 12 символов, буква + цифра + спецсимвол
  */
 
 import { Router } from 'express';
@@ -31,13 +32,11 @@ router.post('/login', async (req, res) => {
     );
 
     const user = rows[0];
-    if (!user) {
-      // Намеренно одинаковое сообщение — не раскрываем, есть ли email
-      return res.status(401).json({ error: 'Неверный email или пароль' });
-    }
 
-    if (!user.is_active) {
-      return res.status(403).json({ error: 'Аккаунт заблокирован. Обратитесь к администратору.' });
+    // Одинаковое сообщение для всех случаев — не раскрываем существование email.
+    // Аудит 2.9: is_active=false тоже возвращает 401 (было 403 — раскрывало email)
+    if (!user || !user.is_active) {
+      return res.status(401).json({ error: 'Неверный email или пароль' });
     }
 
     const passwordOk = await bcrypt.compare(password, user.password_hash);
@@ -45,16 +44,15 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Неверный email или пароль' });
     }
 
-    // Обновляем last_login
     await query('UPDATE users SET last_login = now() WHERE id = $1', [user.id]);
 
     const sessionUser = {
-      id:         user.id,
-      email:      user.email,
-      first_name: user.first_name,
-      last_name:  user.last_name,
-      role:       user.role,
-      force_password_change: user.force_password_change,
+      id:                   user.id,
+      email:                user.email,
+      first_name:           user.first_name,
+      last_name:            user.last_name,
+      role:                 user.role,
+      force_password_change:user.force_password_change,
     };
 
     const token = signToken(sessionUser);
@@ -78,7 +76,6 @@ router.post('/logout', (req, res) => {
 
 router.get('/me', authenticate, async (req, res) => {
   try {
-    // Перечитываем из БД — вдруг роль или is_active изменились
     const { rows } = await query(
       'SELECT id, email, first_name, last_name, role, is_active, force_password_change FROM users WHERE id = $1',
       [req.user.id]
@@ -89,12 +86,12 @@ router.get('/me', authenticate, async (req, res) => {
     }
     const u = rows[0];
     res.json({
-      id:         u.id,
-      email:      u.email,
-      first_name: u.first_name,
-      last_name:  u.last_name,
-      role:       u.role,
-      force_password_change: u.force_password_change,
+      id:                   u.id,
+      email:                u.email,
+      first_name:           u.first_name,
+      last_name:            u.last_name,
+      role:                 u.role,
+      force_password_change:u.force_password_change,
     });
   } catch (err) {
     console.error('[auth/me]', err.message);
@@ -103,6 +100,7 @@ router.get('/me', authenticate, async (req, res) => {
 });
 
 // ── POST /api/auth/password ───────────────────────────────────────────────────
+// Rate limit подключён в server.js на /api/auth/password (аудит 1.2)
 
 router.post('/password', authenticate, async (req, res) => {
   try {
@@ -111,12 +109,10 @@ router.post('/password', authenticate, async (req, res) => {
     if (!old_password || !new_password) {
       return res.status(400).json({ error: 'Укажите старый и новый пароль' });
     }
-    if (new_password.length < 8) {
-      return res.status(400).json({ error: 'Пароль должен быть не менее 8 символов' });
-    }
-    if (!/\d/.test(new_password) || !/[a-zA-Zа-яА-Я]/.test(new_password)) {
-      return res.status(400).json({ error: 'Пароль должен содержать буквы и цифры' });
-    }
+
+    // Аудит 2.10: усиленная политика паролей
+    const pwErr = validatePasswordStrength(new_password);
+    if (pwErr) return res.status(400).json({ error: pwErr });
 
     const { rows } = await query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Пользователь не найден' });
@@ -136,5 +132,24 @@ router.post('/password', authenticate, async (req, res) => {
     res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
+
+// ── Валидация пароля ──────────────────────────────────────────────────────────
+// Возвращает строку с ошибкой или null если всё ок.
+
+export function validatePasswordStrength(password) {
+  if (!password || password.length < 12) {
+    return 'Пароль должен содержать не менее 12 символов';
+  }
+  if (!/\d/.test(password)) {
+    return 'Пароль должен содержать хотя бы одну цифру';
+  }
+  if (!/[a-zA-Zа-яА-Я]/.test(password)) {
+    return 'Пароль должен содержать хотя бы одну букву';
+  }
+  if (!/[^a-zA-Zа-яА-Я0-9]/.test(password)) {
+    return 'Пароль должен содержать хотя бы один специальный символ (!@#$%^&* и т.п.)';
+  }
+  return null;
+}
 
 export default router;

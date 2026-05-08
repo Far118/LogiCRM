@@ -3,17 +3,15 @@
  *
  * GET /api/search?q=текст&limit=20
  *
- * Ищет по:
- *   - companies (name, inn, industry, description)
- *   - contacts  (first_name, last_name, phone, email, position)
- *   - deals     (title, description)
- *   - requests  (route_from, route_to, cargo_description)
- *
- * RBAC: manager видит только свои записи.
+ * Изменения относительно оригинала:
+ *   • Устранена SQL-инъекция: userId больше не конкатенируется в строку запроса.
+ *     Каждый запрос строит собственный массив параметров и подставляет
+ *     userId через позиционный плейсхолдер ($N).
+ *   • Promise.all сохранён — каждый запрос независимо параметризован.
  */
 
 import { Router } from 'express';
-import { query } from '../db/pool.js';
+import { query }  from '../db/pool.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
@@ -23,19 +21,37 @@ router.get('/', async (req, res) => {
   try {
     const { q = '', limit = 20 } = req.query;
     const term = q.trim();
-
     if (term.length < 2) return res.json([]);
 
     const { id: userId, role } = req.user;
     const isManager = role === 'manager';
-    const lim = Math.min(parseInt(limit) || 20, 50);
-    const pattern = `%${term.toLowerCase()}%`;
+    const lim       = Math.min(parseInt(limit) || 20, 50);
+    const pattern   = `%${term.toLowerCase()}%`;
+    const prefix    = `${term.toLowerCase()}%`;
 
-    const ownerWhere = isManager ? `AND owner_id = '${userId}'` : '';
+    // ── Компании ─────────────────────────────────────────────────────────────
+    // userId передаётся как параметр ($4) — не конкатенируется в строку SQL
+    const compParams = [pattern, prefix, Math.ceil(lim * 0.5)];
+    if (isManager) compParams.push(userId);
+    const ownerCompClause = isManager ? `AND owner_id = $${compParams.length}` : '';
+
+    // ── Контакты ─────────────────────────────────────────────────────────────
+    const ctParams = [pattern, `%${term}%`, Math.ceil(lim * 0.3)];
+    if (isManager) ctParams.push(userId);
+    const ownerCtClause = isManager ? `AND co.owner_id = $${ctParams.length}` : '';
+
+    // ── Сделки ───────────────────────────────────────────────────────────────
+    const dealParams = [pattern, Math.ceil(lim * 0.3)];
+    if (isManager) dealParams.push(userId);
+    const ownerDealClause = isManager ? `AND d.owner_id = $${dealParams.length}` : '';
+
+    // ── Запросы ───────────────────────────────────────────────────────────────
+    const reqParams = [pattern, Math.ceil(lim * 0.2)];
+    if (isManager) reqParams.push(userId);
+    const ownerReqClause = isManager ? `AND r.owner_id = $${reqParams.length}` : '';
 
     const [companies, contacts, deals, requests] = await Promise.all([
 
-      // ── Компании ────────────────────────────────────────────────────────────
       query(`
         SELECT
           'company' AS type,
@@ -49,17 +65,16 @@ router.get('/', async (req, res) => {
           inn LIKE $2 OR
           LOWER(industry) LIKE $1 OR
           LOWER(description) LIKE $1
-        ) ${ownerWhere}
+        ) ${ownerCompClause}
         ORDER BY
           CASE WHEN LOWER(name) LIKE $2 THEN 0
                WHEN LOWER(name) LIKE $1 THEN 1
                ELSE 2 END,
           updated_at DESC
         LIMIT $3`,
-        [pattern, `${term.toLowerCase()}%`, Math.ceil(lim * 0.5)]
+        compParams
       ),
 
-      // ── Контакты ────────────────────────────────────────────────────────────
       query(`
         SELECT
           'contact' AS type,
@@ -76,13 +91,12 @@ router.get('/', async (req, res) => {
           ct.phone_alt  LIKE $2 OR
           LOWER(ct.email) LIKE $1 OR
           LOWER(ct.position) LIKE $1
-        ) ${isManager ? "AND co.owner_id = '" + userId + "'" : ''}
+        ) ${ownerCtClause}
         ORDER BY ct.first_name
         LIMIT $3`,
-        [pattern, `%${term}%`, Math.ceil(lim * 0.3)]
+        ctParams
       ),
 
-      // ── Сделки ──────────────────────────────────────────────────────────────
       query(`
         SELECT
           'deal' AS type,
@@ -96,13 +110,12 @@ router.get('/', async (req, res) => {
         WHERE (
           LOWER(d.title) LIKE $1 OR
           LOWER(d.description) LIKE $1
-        ) ${ownerWhere.replace('owner_id', 'd.owner_id')}
+        ) ${ownerDealClause}
         ORDER BY d.updated_at DESC
         LIMIT $2`,
-        [pattern, Math.ceil(lim * 0.3)]
+        dealParams
       ),
 
-      // ── Запросы на перевозку ─────────────────────────────────────────────────
       query(`
         SELECT
           'request' AS type,
@@ -117,19 +130,15 @@ router.get('/', async (req, res) => {
           LOWER(r.route_from) LIKE $1 OR
           LOWER(r.route_to) LIKE $1 OR
           LOWER(r.cargo_description) LIKE $1
-        ) ${ownerWhere.replace('owner_id', 'r.owner_id')}
+        ) ${ownerReqClause}
         ORDER BY r.created_at DESC
         LIMIT $2`,
-        [pattern, Math.ceil(lim * 0.2)]
+        reqParams
       ),
     ]);
 
-    // Объединяем и маркируем тип
     const TYPE_LABELS = {
-      company: 'Компания',
-      contact: 'Контакт',
-      deal:    'Сделка',
-      request: 'Запрос',
+      company: 'Компания', contact: 'Контакт', deal: 'Сделка', request: 'Запрос',
     };
     const TYPE_ORDER = { company: 0, contact: 1, deal: 2, request: 3 };
 
@@ -142,9 +151,9 @@ router.get('/', async (req, res) => {
       .map(r => ({
         ...r,
         type_label: TYPE_LABELS[r.type] || r.type,
-        title:    (r.title || '').trim(),
-        subtitle: (r.subtitle || '').trim(),
-        meta:     (r.meta || '').trim(),
+        title:      (r.title    || '').trim(),
+        subtitle:   (r.subtitle || '').trim(),
+        meta:       (r.meta     || '').trim(),
       }))
       .filter(r => r.title)
       .sort((a, b) => TYPE_ORDER[a.type] - TYPE_ORDER[b.type]);
