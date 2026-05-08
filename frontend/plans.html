@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ru" data-theme="light">
 <head>
+  <style>html{visibility:hidden}</style>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -9,92 +10,54 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/app.css">
   <style>
-    html { visibility: hidden; }
-
-    .month-nav {
-      display: flex; align-items: center; gap: .5rem;
-    }
-    .month-btn {
-      width: 30px; height: 30px; border-radius: var(--r-md);
-      border: 1px solid var(--border); color: var(--text-muted);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1rem; line-height: 1;
-    }
-    .month-btn:hover { background: var(--surface-off); color: var(--text); }
-    .month-cur { font-weight: 600; min-width: 160px; text-align: center; font-size: .95rem; }
+    .month-nav{display:flex;align-items:center;gap:.4rem}
+    .month-btn{width:28px;height:28px;border-radius:var(--r-md);border:1px solid var(--border);color:var(--text-muted);display:flex;align-items:center;justify-content:center;font-size:1rem;line-height:1}
+    .month-btn:hover{background:var(--surface-off);color:var(--text)}
+    .month-cur{font-weight:600;min-width:160px;text-align:center;font-size:.95rem}
+    .edit-hint{display:flex;align-items:center;gap:.4rem;font-size:.75rem;color:var(--text-faint)}
 
     /* Table */
-    .pt-wrap { margin: 1.25rem 1.5rem; overflow-x: auto; }
-    .pt { width: 100%; border-collapse: collapse; }
-    .pt thead th {
-      padding: .5rem .75rem; font-size: .68rem;
-      text-transform: uppercase; letter-spacing: .04em;
-      color: var(--text-faint); font-weight: 600;
-      background: var(--surface-off);
-      border-bottom: 2px solid var(--divider);
-      white-space: nowrap; text-align: right;
-    }
-    .pt thead th:first-child { text-align: left; }
-    .pt tbody tr { border-bottom: 1px solid var(--divider); }
-    .pt tbody tr:last-child { border-bottom: none; }
-    .pt tbody tr:hover td { background: color-mix(in oklch, var(--primary) 3%, var(--surface)); }
+    .pt-wrap{margin:1.25rem 1.5rem;overflow-x:auto}
+    .pt{width:100%;border-collapse:collapse}
+    .pt thead th{padding:.5rem .75rem;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-faint);font-weight:600;background:var(--surface-off);border-bottom:2px solid var(--divider);white-space:nowrap;text-align:right}
+    .pt thead th:first-child{text-align:left}
+    .pt tbody tr{border-bottom:1px solid var(--divider)}
+    .pt tbody tr:last-child{border-bottom:none}
+    .pt tbody tr:hover td{background:color-mix(in oklch,var(--primary) 3%,var(--surface))}
+    .pt td{padding:.55rem .75rem;vertical-align:middle}
+    .pt td:first-child{font-size:.88rem;font-weight:500;white-space:nowrap}
 
-    .pt td { padding: .55rem .75rem; vertical-align: middle; }
-    .pt td:first-child { font-size: .88rem; font-weight: 500; white-space: nowrap; }
+    /* Plan input cell */
+    .pt-cell{display:flex;flex-direction:column;gap:3px;align-items:flex-end}
+    .plan-inp{width:90px;text-align:right;border:1px solid transparent;border-radius:var(--r-sm);padding:.3rem .5rem;font-size:.85rem;background:transparent;color:var(--text);outline:none;font-family:var(--font);font-weight:500;transition:border-color var(--t),background var(--t)}
+    .plan-inp:hover{border-color:var(--border);background:var(--bg)}
+    .plan-inp:focus{border-color:var(--primary);background:var(--bg);box-shadow:0 0 0 3px oklch(from var(--primary) l c h / .12)}
+    .plan-inp.saving{border-color:var(--warning)}
+    .plan-inp.saved{border-color:var(--success)}
 
-    /* Plan cell = input + fact below */
-    .pt-cell { display: flex; flex-direction: column; gap: 3px; align-items: flex-end; }
-    .plan-inp {
-      width: 90px; text-align: right;
-      border: 1px solid transparent; border-radius: var(--r-sm);
-      padding: .3rem .5rem; font-size: .85rem;
-      background: transparent; color: var(--text); outline: none;
-      font-family: var(--font); font-weight: 500;
-      transition: border-color var(--t), background var(--t);
-    }
-    .plan-inp:hover { border-color: var(--border); background: var(--bg); }
-    .plan-inp:focus { border-color: var(--primary); background: var(--bg);
-      box-shadow: 0 0 0 3px oklch(from var(--primary) l c h / .12); }
-    .plan-inp.saving { border-color: var(--warning); }
-    .plan-inp.saved  { border-color: var(--success); }
-
-    /* Fact row below input */
-    .fact-row { display: flex; align-items: center; gap: 4px; }
-    .fact-num { font-size: .7rem; color: var(--text-muted); }
-    .fact-pct {
-      font-size: .68rem; font-weight: 600; padding: 0 4px;
-      border-radius: var(--r-sm);
-    }
-    .f-great { background: color-mix(in oklch,var(--success) 15%,var(--surface)); color:var(--success); }
-    .f-ok    { background: color-mix(in oklch,var(--primary) 15%,var(--surface)); color:var(--primary); }
-    .f-warn  { background: color-mix(in oklch,var(--warning) 15%,var(--surface)); color:var(--warning); }
-    .f-bad   { background: color-mix(in oklch,var(--error)   15%,var(--surface)); color:var(--error);   }
-    .f-none  { color: var(--text-faint); }
-
-    /* Mini bar under fact */
-    .mini-bar { width: 80px; height: 3px; background: var(--surface-off); border-radius: 99px; overflow: hidden; }
-    .mini-fill { height: 100%; border-radius: 99px; transition: width .5s; }
+    /* Fact row */
+    .fact-row{display:flex;align-items:center;gap:4px}
+    .fact-num{font-size:.7rem;color:var(--text-muted)}
+    .fact-pct{font-size:.68rem;font-weight:600;padding:0 4px;border-radius:var(--r-sm)}
+    .f-great{background:color-mix(in oklch,var(--success) 15%,var(--surface));color:var(--success)}
+    .f-ok{background:color-mix(in oklch,var(--primary) 15%,var(--surface));color:var(--primary)}
+    .f-warn{background:color-mix(in oklch,var(--warning) 15%,var(--surface));color:var(--warning)}
+    .f-bad{background:color-mix(in oklch,var(--error) 15%,var(--surface));color:var(--error)}
+    .f-none{color:var(--text-faint)}
+    .mini-bar{width:80px;height:3px;background:var(--surface-off);border-radius:99px;overflow:hidden}
+    .mini-fill{height:100%;border-radius:99px;transition:width .5s}
 
     /* Legend */
-    .legend {
-      margin: 0 1.5rem 1.5rem;
-      padding: .75rem 1.25rem;
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--r-lg); font-size: .78rem; color: var(--text-muted);
-      display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: center;
-    }
-    .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+    .legend{margin:0 1.5rem 1.5rem;padding:.75rem 1.25rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);font-size:.78rem;color:var(--text-muted);display:flex;gap:1.5rem;flex-wrap:wrap;align-items:center}
+    .legend-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
 
-    /* Hint */
-    .edit-hint {
-      display: flex; align-items: center; gap: .4rem;
-      font-size: .75rem; color: var(--text-faint);
-    }
-
-    @media (max-width: 900px) { .pt-wrap { margin: 1rem; } }
+    /* Copy modal */
+    .copy-modal-body{padding:1.25rem}
+    .copy-select-wrap{display:flex;gap:.75rem;margin-top:.75rem}
   </style>
 </head>
-<body>
+
+<body x-data="plansPage" x-init="init()">
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
   <aside class="sidebar" id="sidebar"></aside>
 
@@ -106,11 +69,23 @@
         </svg>
       </button>
       <h1 class="topbar-title">Планы продаж</h1>
+
+      <!-- Навигация по месяцам -->
       <div class="month-nav">
-        <button class="month-btn" id="prevMonth">‹</button>
-        <div class="month-cur" id="monthCur">…</div>
-        <button class="month-btn" id="nextMonth">›</button>
+        <button class="month-btn" @click="prevMonth()">‹</button>
+        <div class="month-cur" x-text="monthTitle"></div>
+        <button class="month-btn" @click="nextMonth()">›</button>
       </div>
+
+      <!-- Кнопка копирования -->
+      <button class="btn btn-ghost" @click="openCopyModal()" title="Скопировать планы с другого месяца">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+          <rect x="9" y="9" width="13" height="13" rx="2"/>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        Скопировать с другого месяца
+      </button>
+
       <div class="edit-hint">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -121,228 +96,182 @@
     </header>
 
     <div class="content-bare" style="overflow-y:auto">
-      <div class="pt-wrap">
+
+      <!-- Скелетон -->
+      <div x-show="loading" class="pt-wrap">
+        <div class="skeleton" style="width:60%;height:14px;border-radius:4px"></div>
+        <div class="skeleton" style="width:100%;height:40px;margin-top:.75rem;border-radius:4px"></div>
+        <div class="skeleton" style="width:100%;height:40px;margin-top:.5rem;border-radius:4px"></div>
+      </div>
+
+      <!-- Нет менеджеров -->
+      <div x-show="!loading && !users.length" style="padding:3rem;text-align:center;color:var(--text-muted)">
+        Нет активных менеджеров
+      </div>
+
+      <!-- Таблица планов -->
+      <div class="pt-wrap" x-show="!loading && users.length">
         <div class="table-wrap">
-          <table class="pt" id="planTable">
+          <table class="pt">
             <thead>
               <tr>
                 <th>Менеджер</th>
-                <th>Выручка, ₽</th>
-                <th>Сделок</th>
-                <th>Активностей</th>
-                <th>Звонков</th>
-                <th>Встреч</th>
-                <th>КП</th>
-                <th>Компаний</th>
+                <!-- Заголовки полей -->
+                <template x-for="f in fields" :key="f.key">
+                  <th x-text="f.label"></th>
+                </template>
               </tr>
             </thead>
-            <tbody id="planBody">
-              <tr><td colspan="8" style="padding:2rem;text-align:center">
-                <div class="skeleton" style="width:40%;margin:0 auto;height:12px;border-radius:4px"></div>
-              </td></tr>
+            <tbody>
+              <!--
+                x-for по users — каждая строка = один менеджер.
+                Инпуты с data-uid и data-field — для чтения значений при сохранении.
+              -->
+              <template x-for="u in users" :key="u.id">
+                <tr :data-uid="u.id">
+                  <!-- Имя менеджера -->
+                  <td x-text="userName(u)"></td>
+
+                  <!-- Ячейки по полям -->
+                  <template x-for="f in fields" :key="f.key">
+                    <td>
+                      <div class="pt-cell">
+
+                        <!-- Инпут: значение берётся из плана или 0 -->
+                        <input
+                          class="plan-inp"
+                          :class="{
+                            saving: saveState[stateKey(u.id, f.key)] === 'saving',
+                            saved:  saveState[stateKey(u.id, f.key)] === 'saved',
+                          }"
+                          type="number" min="0"
+                          :data-uid="u.id"
+                          :data-field="f.key"
+                          :value="targetVal(u.id, f.key) || ''"
+                          placeholder="—"
+                          @focus="$event.target.select()"
+                          @input="onInput(u.id, f.key)"
+                          @blur="onBlur(u.id, f.key)"
+                          @keydown.enter.prevent="$event.target.blur()"
+                          @keydown.escape="$event.target.blur()"
+                        >
+
+                        <!-- Факт + процент -->
+                        <template x-if="factVal(u.id, f.key) !== null">
+                          <div>
+                            <div class="fact-row">
+                              <span class="fact-num" x-text="fmtNum(factVal(u.id, f.key), f.key)"></span>
+                              <template x-if="pct(u.id, f.key) !== null">
+                                <span
+                                  class="fact-pct"
+                                  :class="pctClass(pct(u.id, f.key))"
+                                  x-text="pct(u.id, f.key) + '%'"
+                                ></span>
+                              </template>
+                            </div>
+                            <!-- Минибар прогресса -->
+                            <template x-if="targetVal(u.id, f.key) > 0">
+                              <div class="mini-bar">
+                                <div
+                                  class="mini-fill"
+                                  :style="`width:${Math.min(pct(u.id, f.key)||0, 100)}%;background:${pctColor(pct(u.id, f.key))}`"
+                                ></div>
+                              </div>
+                            </template>
+                          </div>
+                        </template>
+
+                      </div>
+                    </td>
+                  </template>
+
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>
       </div>
 
-      <div class="legend">
+      <!-- Легенда -->
+      <div class="legend" x-show="!loading && users.length">
         <strong style="color:var(--text)">Прогресс:</strong>
-        <span><span class="legend-dot" style="background:var(--success)"></span>Выполнено</span>
+        <span><span class="legend-dot" style="background:var(--success)"></span>Выполнено (≥ 100%)</span>
         <span><span class="legend-dot" style="background:var(--primary)"></span>По графику</span>
         <span><span class="legend-dot" style="background:var(--warning)"></span>Небольшое отставание</span>
         <span><span class="legend-dot" style="background:var(--error)"></span>Сильное отставание</span>
         <span style="color:var(--text-faint);font-size:.72rem">График считается пропорционально пройденным дням месяца</span>
       </div>
+
+    </div><!-- /content-bare -->
+  </div><!-- /main -->
+
+  <!-- ══════════════════════════════════════════════════════════
+       МОДАЛЬНОЕ ОКНО: Копировать с другого месяца
+       ══════════════════════════════════════════════════════════ -->
+  <div class="modal-backdrop" x-show="copyModal" x-cloak @click.self="copyModal = false">
+    <div class="modal modal-sm">
+      <div class="modal-head">
+        <h3 class="modal-title">Скопировать планы</h3>
+      </div>
+      <div class="copy-modal-body">
+        <p style="font-size:.9em;color:var(--text-muted)">
+          Планы из выбранного месяца будут скопированы в
+          <strong x-text="monthTitle"></strong>.
+          Существующие планы будут перезаписаны.
+        </p>
+
+        <!-- Выбор месяца-источника -->
+        <div class="copy-select-wrap">
+          <div class="field" style="flex:1">
+            <label class="field-label">Месяц-источник</label>
+            <select class="select" x-model.number="copyFrom.month">
+              <option value="1">Январь</option>
+              <option value="2">Февраль</option>
+              <option value="3">Март</option>
+              <option value="4">Апрель</option>
+              <option value="5">Май</option>
+              <option value="6">Июнь</option>
+              <option value="7">Июль</option>
+              <option value="8">Август</option>
+              <option value="9">Сентябрь</option>
+              <option value="10">Октябрь</option>
+              <option value="11">Ноябрь</option>
+              <option value="12">Декабрь</option>
+            </select>
+          </div>
+          <div class="field" style="width:90px">
+            <label class="field-label">Год</label>
+            <input
+              type="number"
+              class="input"
+              x-model.number="copyFrom.year"
+              min="2020" max="2099"
+            >
+          </div>
+        </div>
+
+        <p style="margin-top:.75rem;font-size:.8em;color:var(--text-muted)">
+          Будет скопировано:
+          <strong x-text="copyFromTitle"></strong>
+          →
+          <strong x-text="monthTitle"></strong>
+        </p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" @click="copyModal = false" :disabled="copying">Отмена</button>
+        <button
+          class="btn btn-primary"
+          @click="confirmCopy()"
+          :disabled="copying"
+        >
+          <span x-show="!copying">Скопировать</span>
+          <span x-show="copying">Копируем…</span>
+        </button>
+      </div>
     </div>
   </div>
 
   <div class="toast" id="toast"></div>
-
-  <script type="module">
-    import { initUI, esc, toast } from '/js/ui.js';
-
-    const session = await initUI({ active: 'plans', roles: ['admin', 'head'] });
-    if (!session) throw new Error('no access');
-
-    const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь',
-                    'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
-    const FIELDS = [
-      { key: 'target_revenue',       label: 'Выручка'    },
-      { key: 'target_deals_won',     label: 'Сделки'     },
-      { key: 'target_activities',    label: 'Активности' },
-      { key: 'target_calls',         label: 'Звонки'     },
-      { key: 'target_meetings',      label: 'Встречи'    },
-      { key: 'target_proposals',     label: 'КП'         },
-      { key: 'target_new_companies', label: 'Компании'   },
-    ];
-    const FACT_KEYS = {
-      target_revenue: 'revenue', target_deals_won: 'deals_won',
-      target_activities: 'activities', target_calls: 'calls',
-      target_meetings: 'meetings', target_proposals: 'proposals',
-      target_new_companies: 'new_companies',
-    };
-
-    const now = new Date();
-    let year  = now.getFullYear();
-    let month = now.getMonth() + 1;
-    let users = [], plansData = [];
-
-    // ── Навигация по месяцам ───────────────────────────────────────────────
-    document.getElementById('prevMonth').addEventListener('click', () => {
-      if (--month < 1) { month = 12; year--; }
-      load();
-    });
-    document.getElementById('nextMonth').addEventListener('click', () => {
-      if (++month > 12) { month = 1; year++; }
-      load();
-    });
-
-    // ── Загрузка ───────────────────────────────────────────────────────────
-    async function load() {
-      document.getElementById('monthCur').textContent = MONTHS[month-1] + ' ' + year;
-
-      const [usersRes, plansRes] = await Promise.all([
-        fetch('/api/users', { credentials: 'include' })
-          .then(r => r.json()).catch(() => []),
-        fetch('/api/plans?year=' + year + '&month=' + month, { credentials: 'include' })
-          .then(r => r.json()).catch(() => []),
-      ]);
-
-      users     = (usersRes || []).filter(u => u.is_active && u.role !== 'admin');
-      plansData = plansRes || [];
-      render();
-    }
-
-    await load();
-
-    // ── Рендер ────────────────────────────────────────────────────────────
-    function render() {
-      const daysTotal  = new Date(year, month, 0).getDate();
-      const isThisMonth = year === now.getFullYear() && month === now.getMonth() + 1;
-      const daysPassed  = isThisMonth ? now.getDate() : daysTotal;
-      const monthPct    = Math.round(daysPassed / daysTotal * 100);
-
-      if (!users.length) {
-        document.getElementById('planBody').innerHTML =
-          '<tr><td colspan="8" style="padding:2rem;text-align:center;color:var(--text-muted)">Нет активных менеджеров</td></tr>';
-        return;
-      }
-
-      document.getElementById('planBody').innerHTML = users.map(u => {
-        const plan = plansData.find(p => p.user_id === u.id);
-        const fact = plan ? plan.fact : null;
-        const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email;
-
-        const cells = FIELDS.map(f => {
-          const targetVal = plan ? (plan[f.key] || 0) : 0;
-          const factVal   = fact  ? (fact[FACT_KEYS[f.key]] || 0) : null;
-          const factStr   = factVal !== null ? fmtNum(factVal, f.key) : null;
-
-          let pctHtml = '', barHtml = '';
-          if (factVal !== null && targetVal > 0) {
-            const pct = Math.min(Math.round(factVal / targetVal * 100), 999);
-            const cls = pct >= 100 ? 'f-great' : pct >= monthPct ? 'f-ok'
-              : pct >= monthPct * 0.7 ? 'f-warn' : 'f-bad';
-            const barColor = pct >= 100 ? 'var(--success)' : pct >= monthPct
-              ? 'var(--primary)' : pct >= monthPct * 0.7 ? 'var(--warning)' : 'var(--error)';
-            pctHtml = '<span class="fact-pct ' + cls + '">' + pct + '%</span>';
-            barHtml = '<div class="mini-bar"><div class="mini-fill" style="width:' +
-              Math.min(pct,100) + '%;background:' + barColor + '"></div></div>';
-          }
-
-          return '<td><div class="pt-cell">' +
-            '<input class="plan-inp" type="number" min="0"' +
-            ' data-uid="' + u.id + '" data-field="' + f.key + '"' +
-            ' value="' + (targetVal || '') + '"' +
-            ' placeholder="—">' +
-            (factStr !== null
-              ? '<div class="fact-row"><span class="fact-num">' + factStr + '</span>' + pctHtml + '</div>' +
-                (barHtml ? '<div>' + barHtml + '</div>' : '')
-              : '') +
-            '</div></td>';
-        }).join('');
-
-        return '<tr data-uid="' + u.id + '"><td>' + esc(name) + '</td>' + cells + '</tr>';
-      }).join('');
-
-      attachInputs();
-    }
-
-    function fmtNum(n, field) {
-      n = Number(n || 0);
-      if (field === 'target_revenue') {
-        if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
-        if (n >= 1000)    return (n/1000).toFixed(0) + 'K';
-      }
-      return String(n);
-    }
-
-    // ── Автосохранение при уходе с поля ───────────────────────────────────
-    const saveTimers = {};
-
-    function attachInputs() {
-      document.querySelectorAll('.plan-inp').forEach(inp => {
-        inp.addEventListener('focus', () => {
-          inp.select();
-        });
-        inp.addEventListener('input', () => {
-          // Показываем что есть несохранённые изменения
-          inp.classList.remove('saved');
-          inp.classList.add('saving');
-          clearTimeout(saveTimers[inp.dataset.uid + inp.dataset.field]);
-          saveTimers[inp.dataset.uid + inp.dataset.field] = setTimeout(
-            () => savePlanForUser(inp.dataset.uid, inp),
-            800
-          );
-        });
-        inp.addEventListener('blur', () => {
-          clearTimeout(saveTimers[inp.dataset.uid + inp.dataset.field]);
-          savePlanForUser(inp.dataset.uid, inp);
-        });
-        inp.addEventListener('keydown', e => {
-          if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
-          if (e.key === 'Tab')   { savePlanForUser(inp.dataset.uid, inp); }
-          if (e.key === 'Escape') { inp.blur(); }
-        });
-      });
-    }
-
-    async function savePlanForUser(userId, changedInput) {
-      // Собираем все поля этого пользователя
-      const inputs = document.querySelectorAll('[data-uid="' + userId + '"]');
-      const data = { user_id: userId, year, month };
-      inputs.forEach(inp => {
-        data[inp.dataset.field] = parseInt(inp.value) || 0;
-      });
-
-      changedInput.classList.add('saving');
-      changedInput.classList.remove('saved');
-
-      try {
-        const res = await fetch('/api/plans', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-        if (!res.ok) throw new Error((await res.json()).error);
-
-        changedInput.classList.remove('saving');
-        changedInput.classList.add('saved');
-
-        // Обновляем данные планов без перерендера всей таблицы
-        const updated = await res.json();
-        const idx = plansData.findIndex(p => p.user_id === userId);
-        if (idx >= 0) plansData[idx] = { ...plansData[idx], ...updated };
-        else plansData.push(updated);
-
-        // Тихо снимаем подсветку через 1.5с
-        setTimeout(() => changedInput.classList.remove('saved'), 1500);
-      } catch(err) {
-        changedInput.classList.remove('saving');
-        toast('Ошибка сохранения: ' + err.message, 'error');
-      }
-    }
-  </script>
+  <script type="module" src="/js/pages/plans.js"></script>
 </body>
 </html>

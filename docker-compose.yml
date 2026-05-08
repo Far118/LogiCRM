@@ -43,6 +43,8 @@ services:
       ADMIN_EMAIL:   ${ADMIN_EMAIL:-admin@logicrm.local}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123!}
       DADATA_API_KEY: ${DADATA_API_KEY}
+      VAPID_PUBLIC_KEY:  ${VAPID_PUBLIC_KEY}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
     ports:
       - "127.0.0.1:3000:3000"   # только localhost; внешний трафик через nginx
 

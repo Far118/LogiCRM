@@ -671,6 +671,7 @@ a, button, input, select, textarea {
   justify-content: flex-end;
   align-items: center;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 .modal-foot-left { margin-right: auto; display: flex; gap: .5rem; }
 
