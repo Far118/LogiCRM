@@ -58,4 +58,6 @@ export const config = {
 
   // Dadata API (поиск по ИНН): https://dadata.ru/profile/#info
   dadataApiKey: process.env.DADATA_API_KEY ?? '',
+vapidPublicKey:  process.env.VAPID_PUBLIC_KEY  || '',
+vapidPrivateKey: process.env.VAPID_PRIVATE_KEY || '',
 };
