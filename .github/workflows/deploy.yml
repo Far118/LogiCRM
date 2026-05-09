@@ -7,17 +7,16 @@ on:
 
 jobs:
   # ── Security scanning — запускается до деплоя ─────────────────────────────
-  # M-4: npm audit + secret scan блокируют деплой при нахождении уязвимостей
   security:
     name: Security Scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af  # v4.1.0
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
@@ -39,14 +38,14 @@ jobs:
     name: Build & Deploy
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [security]   # M-4: деплой заблокирован если security не прошёл
+    needs: [security]
 
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af  # v4.1.0
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -60,14 +59,13 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      # H-5: SSH agent SHA-запинен на конкретный коммит (не мутабельный тег)
       - name: Setup SSH agent
-        uses: webfactory/ssh-agent@dc588b651fe13d87b7e1d423afe79eb55f4fc4ac  # v0.9.0
+        uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      # M-5: SSH_HOST_KEY хранится как секрет — не доверяем первому ключу от сервера (TOFU).
-      # Как получить: ssh-keyscan -H ВАШ_СЕРВЕР (один раз, сохранить в GitHub Secrets)
+      # M-5: SSH_HOST_KEY хранится как секрет — не доверяем первому ключу (TOFU).
+      # Как получить: ssh-keyscan -H ВАШ_СЕРВЕР → сохранить в GitHub Secrets как SSH_HOST_KEY
       - name: Set known hosts
         run: echo "${{ secrets.SSH_HOST_KEY }}" >> ~/.ssh/known_hosts
 
@@ -98,9 +96,8 @@ jobs:
           rsync -az docker-compose.yml \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/docker-compose.yml
 
-      # H-5: appleboy/ssh-action SHA-запинен
       - name: Deploy on server
-        uses: appleboy/ssh-action@2afe78b09d70a5b5e19db8e0f71b5e0cd81f8cec  # v1.0.3
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host:        ${{ secrets.SSH_HOST }}
           username:    ${{ secrets.SSH_USER }}
