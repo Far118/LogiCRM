@@ -30,7 +30,7 @@ jobs:
         run: npm audit --audit-level=high
 
       - name: Secret scan (Gitleaks)
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc93d4a5b070e66c09a4cad9f2  # v2
+        uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
