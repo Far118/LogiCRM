@@ -64,8 +64,6 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      # M-5: SSH_HOST_KEY хранится как секрет — не доверяем первому ключу (TOFU).
-      # Как получить: ssh-keyscan -H ВАШ_СЕРВЕР → сохранить в GitHub Secrets как SSH_HOST_KEY
       - name: Set known hosts
         run: echo "${{ secrets.SSH_HOST_KEY }}" >> ~/.ssh/known_hosts
 
