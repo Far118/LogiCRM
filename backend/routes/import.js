@@ -3,11 +3,16 @@
  *
  * POST /api/import/companies — принимает массив компаний, bulk insert
  * GET  /api/import/template  — скачать шаблон CSV
+ *
+ * Исправления (аудит):
+ *   H-2  owner_id теперь принимается только от admin/head
+ *   H-4  err.message не раскрывается клиенту в production
  */
 
 import { Router } from 'express';
 import { query, tx } from '../db/pool.js';
 import { authenticate } from '../middleware/auth.js';
+import { config } from '../config.js';
 
 const router = Router();
 router.use(authenticate);
@@ -34,10 +39,9 @@ router.get('/template', (req, res) => {
   ].join(',');
 
   const csv = `${headers}\n${example}\n`;
-
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename="logicrm_import_template.csv"');
-  res.send('\uFEFF' + csv); // BOM для корректного открытия в Excel
+  res.send('\uFEFF' + csv);
 });
 
 // ── Bulk import ───────────────────────────────────────────────────────────────
@@ -53,28 +57,30 @@ router.post('/companies', async (req, res) => {
       return res.status(400).json({ error: 'Максимум 5000 строк за раз' });
     }
 
-    const ownerId = owner_id || req.user.id;
+    // H-2 IDOR fix: только admin/head могут назначить другого owner_id.
+    // Менеджер всегда становится ответственным за импортируемые компании.
+    const ownerId = (
+      ['admin', 'head'].includes(req.user.role) && owner_id
+    ) ? owner_id : req.user.id;
 
-    // Валидация и нормализация
-    const errors   = [];
-    const valid    = [];
-    const SEGMENTS = ['cold_lead','warm_lead','hot_lead','active_client','vip','inactive','lost'];
+    const errors    = [];
+    const valid     = [];
+    const SEGMENTS  = ['cold_lead','warm_lead','hot_lead','active_client','vip','inactive','lost'];
     const PRIORITIES = ['high','medium','low'];
 
     data.forEach((row, i) => {
-      const line = i + 2; // +2 потому что строка 1 — заголовки
-      const inn = String(row.inn || '').replace(/\D/g, '');
+      const line = i + 2;
+      const inn  = String(row.inn || '').replace(/\D/g, '');
       if (!inn) { errors.push({ line, field: 'inn', msg: 'ИНН обязателен' }); return; }
       if (inn.length !== 10 && inn.length !== 12) {
         errors.push({ line, field: 'inn', msg: `Некорректный ИНН: ${row.inn} (нужно 10 или 12 цифр)` }); return;
       }
 
-      // Название: если не задано — используем ИНН как временное
       const rawName = String(row.name || '').trim();
-      const name = rawName || `Компания ИНН ${inn}`;
+      const name    = rawName || `Компания ИНН ${inn}`;
       if (rawName.length > 500) { errors.push({ line, field: 'name', msg: 'Слишком длинное название' }); return; }
 
-      const segment  = SEGMENTS.includes(row.segment)   ? row.segment  : 'cold_lead';
+      const segment  = SEGMENTS.includes(row.segment)    ? row.segment  : 'cold_lead';
       const priority = PRIORITIES.includes(row.priority) ? row.priority : 'medium';
 
       const parseList = (val) => {
@@ -84,7 +90,7 @@ router.post('/companies', async (req, res) => {
 
       valid.push({
         name,
-        inn:              inn || '',
+        inn,
         ogrn:             String(row.ogrn || '').replace(/\D/g, ''),
         website:          String(row.website || '').trim(),
         address_legal:    String(row.address_legal || '').trim(),
@@ -106,7 +112,6 @@ router.post('/companies', async (req, res) => {
         tags:             parseList(row.tags),
         next_action_type: '',
         owner_id:         ownerId,
-        // Контакт из отдельных колонок
         _contact: row.contact_name ? {
           first_name: String(row.contact_name || '').split(' ')[0] || '',
           last_name:  String(row.contact_name || '').split(' ').slice(1).join(' ') || '',
@@ -117,7 +122,6 @@ router.post('/companies', async (req, res) => {
       });
     });
 
-    // Если критических ошибок много — останавливаемся
     if (errors.length > 50) {
       return res.status(422).json({
         error: `Слишком много ошибок (${errors.length}). Проверьте файл.`,
@@ -125,12 +129,11 @@ router.post('/companies', async (req, res) => {
       });
     }
 
-    // Получаем существующие ИНН для update_existing
-    const innList = valid.map(r => r.inn); // ИНН всегда есть — прошёл валидацию
+    const innList       = valid.map(r => r.inn);
     const existingByInn = {};
     if (update_existing && innList.length) {
       const { rows: existing } = await query(
-        `SELECT id, inn FROM companies WHERE inn = ANY($1)`,
+        'SELECT id, inn FROM companies WHERE inn = ANY($1)',
         [innList]
       );
       existing.forEach(r => { existingByInn[r.inn] = r.id; });
@@ -142,11 +145,9 @@ router.post('/companies', async (req, res) => {
 
       for (const row of valid) {
         const { _contact, ...company } = row;
-
         const existId = existingByInn[company.inn] || null;
 
         if (existId && update_existing) {
-          // Обновляем существующую
           await client.query(`
             UPDATE companies SET
               name=$1, industry=$2, description=$3, segment=$4, priority=$5,
@@ -169,7 +170,6 @@ router.post('/companies', async (req, res) => {
         } else if (existId && !update_existing) {
           skipped++;
         } else {
-          // Создаём новую
           const { rows } = await client.query(`
             INSERT INTO companies (
               name, inn, ogrn, website, address_legal, address_actual,
@@ -198,7 +198,6 @@ router.post('/companies', async (req, res) => {
         }
       }
 
-      // Создаём контакты пачкой
       for (const c of contactsToCreate) {
         if (!c.first_name) continue;
         await client.query(`
@@ -215,7 +214,9 @@ router.post('/companies', async (req, res) => {
     res.json({ ok: true, ...result });
   } catch (err) {
     console.error('[import/companies]', err.message);
-    res.status(500).json({ error: err.message });
+    // H-4: не раскрываем детали ошибки БД клиенту в production
+    const safe = config.isProd ? 'Ошибка импорта' : err.message;
+    res.status(500).json({ error: safe });
   }
 });
 

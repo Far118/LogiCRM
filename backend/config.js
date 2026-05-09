@@ -41,7 +41,11 @@ export const config = {
     database: process.env.DB_NAME     ?? 'logicrm',
     user:     process.env.DB_USER     ?? 'logicrm',
     password: require_env('DB_PASSWORD'),
-    ssl:      process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+    // H-3: DB SSL без верификации сертификата небезопасен (rejectUnauthorized: false).
+    // PostgreSQL работает в изолированной Docker-сети (expose, не ports) —
+    // TLS между контейнерами на одном хосте не нужен. DB_SSL=true отключён.
+    // Если БД выносится на отдельный хост — использовать DB_SSL_CA_PATH.
+    ssl:      false,
     max:              parseInt(process.env.DB_POOL_MAX ?? '10', 10),
     idleTimeoutMs:    30_000,
     connectTimeoutMs:  5_000,

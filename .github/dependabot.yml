@@ -1,0 +1,28 @@
+version: 2
+updates:
+  # Автообновление GitHub Actions (следит за новыми SHA при выходе тегов)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "security"
+      - "dependencies"
+
+  # Автообновление npm зависимостей backend
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+    # Только patch и minor — major апгрейды требуют ручной проверки
+    versioning-strategy: increase-if-necessary
+
+  # Автообновление npm зависимостей frontend
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"

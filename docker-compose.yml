@@ -86,7 +86,14 @@ services:
     volumes:
       - ./frontend/dist:/var/www/logicrm/dist:ro
       - ./nginx/logicrm.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
+      # Сертификаты хранятся вне репозитория на хосте (не в nginx/ssl/).
+      # Первичная настройка на сервере:
+      #   sudo mkdir -p /opt/logicrm-certs
+      #   sudo cp /etc/letsencrypt/archive/mankochat.ru/fullchain*.pem /opt/logicrm-certs/fullchain.pem
+      #   sudo cp /etc/letsencrypt/archive/mankochat.ru/privkey*.pem   /opt/logicrm-certs/privkey.pem
+      #   sudo chmod 644 /opt/logicrm-certs/*.pem
+      # Обновление при выпуске нового сертификата: scripts/renew-certs.sh
+      - /opt/logicrm-certs:/etc/nginx/ssl:ro
       - nginxlogs:/var/log/nginx
     security_opt:
       - no-new-privileges:true

@@ -27,12 +27,22 @@ export function signToken(user) {
   );
 }
 
+// L-4: парсим JWT_EXPIRES_IN для синхронизации cookie maxAge с временем жизни токена.
+// Без этого: JWT_EXPIRES_IN=4h → cookie живёт 8ч → запросы падают с 401,
+// пока cookie ещё есть в браузере.
+function parseDuration(str) {
+  const match = String(str).match(/^(\d+)(h|m|s|d)$/i);
+  if (!match) return 8 * 60 * 60 * 1000; // дефолт 8 часов
+  const units = { h: 3_600_000, m: 60_000, s: 1_000, d: 86_400_000 };
+  return parseInt(match[1]) * units[match[2].toLowerCase()];
+}
+
 export function setCookie(res, token) {
   res.cookie(config.jwt.cookieName, token, {
     httpOnly: true,
     secure:   config.isProd,
     sameSite: 'strict',
-    maxAge:   8 * 60 * 60 * 1000,
+    maxAge:   parseDuration(config.jwt.expiresIn),
   });
 }
 

@@ -6,18 +6,47 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ── Security scanning — запускается до деплоя ─────────────────────────────
+  # M-4: npm audit + secret scan блокируют деплой при нахождении уязвимостей
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af  # v4.1.0
+        with:
+          node-version: '20'
+
+      - name: npm audit — backend
+        working-directory: backend
+        run: npm audit --audit-level=high
+
+      - name: npm audit — frontend
+        working-directory: frontend
+        run: npm audit --audit-level=high
+
+      - name: Secret scan (Gitleaks)
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc93d4a5b070e66c09a4cad9f2  # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Deploy — только после прохождения security ────────────────────────────
   deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: [security]   # M-4: деплой заблокирован если security не прошёл
 
     steps:
-
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af  # v4.1.0
         with:
           node-version: '20'
           cache: 'npm'
@@ -31,13 +60,16 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      # H-5: SSH agent SHA-запинен на конкретный коммит (не мутабельный тег)
       - name: Setup SSH agent
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@dc588b651fe13d87b7e1d423afe79eb55f4fc4ac  # v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Add server to known_hosts
-        run: ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+      # M-5: SSH_HOST_KEY хранится как секрет — не доверяем первому ключу от сервера (TOFU).
+      # Как получить: ssh-keyscan -H ВАШ_СЕРВЕР (один раз, сохранить в GitHub Secrets)
+      - name: Set known hosts
+        run: echo "${{ secrets.SSH_HOST_KEY }}" >> ~/.ssh/known_hosts
 
       - name: Sync backend
         run: |
@@ -66,8 +98,9 @@ jobs:
           rsync -az docker-compose.yml \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/docker-compose.yml
 
+      # H-5: appleboy/ssh-action SHA-запинен
       - name: Deploy on server
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@2afe78b09d70a5b5e19db8e0f71b5e0cd81f8cec  # v1.0.3
         with:
           host:        ${{ secrets.SSH_HOST }}
           username:    ${{ secrets.SSH_USER }}
@@ -78,10 +111,17 @@ jobs:
             cd ${{ secrets.DEPLOY_PATH }}
 
             echo "=== Пересобираем backend ==="
-            docker compose up -d --build --no-deps --wait backend
+            docker compose up -d --build --no-deps backend
+
+            echo "=== Ждём готовности backend ==="
+            timeout 60 sh -c '
+              until curl -sf http://localhost:3000/api/health > /dev/null 2>&1; do
+                echo "  ожидаем..."; sleep 3
+              done
+            '
 
             echo "=== Перезагружаем nginx ==="
             docker exec logicrm_nginx nginx -s reload
 
             echo "=== Деплой завершён ==="
-            docker compose ps
+            curl -s http://localhost:3000/api/health

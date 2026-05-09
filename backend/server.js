@@ -199,14 +199,10 @@ app.use('/api/search',     searchRoutes);
 app.use('/api/plans',          plansRoutes);
 app.use('/api/notifications',  notificationsRoutes);
 
-// Health check
+// Health check — L-2: убраны env и pid из публичного ответа
+// (env раскрывает конфигурацию, pid — вектор для атак на конкретный воркер)
 app.get('/api/health', (_req, res) => {
-  res.json({
-    ok:     true,
-    env:    config.nodeEnv,
-    pid:    process.pid,           // показывает какой воркер ответил
-    ts:     new Date().toISOString(),
-  });
+  res.json({ ok: true, ts: new Date().toISOString() });
 });
 
 // 404 для неизвестных API-путей

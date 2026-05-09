@@ -59,6 +59,11 @@ router.post('/subscribe', async (req, res) => {
       return res.status(400).json({ error: 'Некорректные данные подписки' });
     }
 
+  // Аудит: валидируем что endpoint — корректный URL перед сохранением
+    try { new URL(endpoint); } catch {
+      return res.status(400).json({ error: 'Некорректный endpoint' });
+    }
+
     // Upsert: обновляем если уже есть, создаём если нет
     await knex('push_subscriptions')
       .insert({
