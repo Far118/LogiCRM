@@ -109,11 +109,19 @@ jobs:
             docker compose up -d --build --no-deps backend
 
             echo "=== Ждём готовности backend ==="
-            timeout 60 sh -c '
-              until docker exec logicrm_backend wget -qO- http://localhost:3000/api/health > /dev/null 2>&1; do
-                echo "  ожидаем..."; sleep 3
-              done
-            '
+            for i in $(seq 1 20); do
+              if docker exec logicrm_backend wget -qO- http://localhost:3000/api/health > /dev/null 2>&1; then
+                echo "Backend готов (попытка $i)"
+                break
+              fi
+              if [ "$i" = "20" ]; then
+                echo "Backend не ответил за 60 секунд"
+                docker logs logicrm_backend --tail 20
+                exit 1
+              fi
+              echo "  ожидаем... ($i/20)"
+              sleep 3
+            done
 
             echo "=== Перезагружаем nginx ==="
             docker exec logicrm_nginx nginx -s reload
