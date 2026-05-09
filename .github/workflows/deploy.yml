@@ -109,9 +109,8 @@ jobs:
             docker compose up -d --build --no-deps backend
 
             echo "=== Ждём готовности backend ==="
-            # Backend порт закрыт снаружи (expose, не ports) — проверяем через nginx
             timeout 60 sh -c '
-              until docker exec logicrm_backend curl -sf http://localhost:3000/api/health > /dev/null 2>&1; do
+              until docker exec logicrm_backend wget -qO- http://localhost:3000/api/health > /dev/null 2>&1; do
                 echo "  ожидаем..."; sleep 3
               done
             '
@@ -120,4 +119,4 @@ jobs:
             docker exec logicrm_nginx nginx -s reload
 
             echo "=== Деплой завершён ==="
-            docker exec logicrm_backend curl -s http://localhost:3000/api/health
+            docker exec logicrm_backend wget -qO- http://localhost:3000/api/health

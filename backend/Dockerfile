@@ -6,7 +6,8 @@ WORKDIR /app
 # и не позволяет drift'у зависимостей. --ignore-scripts блокирует postinstall-скрипты
 # (supply-chain защита), --omit=dev исключает dev-зависимости из образа.
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts
+RUN npm ci --omit=dev --ignore-scripts && \
+    apk add --no-cache curl
 
 # --chown=node:node: файлы принадлежат непривилегированному пользователю node
 COPY --chown=node:node . .
